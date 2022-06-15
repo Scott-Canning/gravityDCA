@@ -48,7 +48,7 @@ describe("Local Keepers Simulation", function () {
     let contract, sourceToken, targetToken1, targetToken2, targetToken3, 
         signer1, signer2, signer3, signer4, signer5;
 
-    let AssetPrices = [0, 2000, 30000, 1]; // null, ETH, BTC, MATIC
+    let AssetPrices = [2000, 30000, 1]; // null, ETH, BTC, MATIC
 
     before("Deploy testing tokens and StrategyFactory.sol", async function () { 
         // Deploy ERC20 source token
@@ -161,12 +161,12 @@ describe("Local Keepers Simulation", function () {
         }
 
         // Expectation target balances
-        let tgtBalSigner1_ETH = deposit1_ETH / AssetPrices[1];
-        let tgtBalSigner1_BTC = deposit1_BTC / AssetPrices[2];
-        let tgtBalSigner2_BTC = deposit2 / AssetPrices[2];
-        let tgtBalSigner3_ETH = deposit3 / AssetPrices[1];
-        let tgtBalSigner4_BTC = deposit4 / AssetPrices[2];
-        let tgtBalSigner5_MATIC = deposit5 / AssetPrices[3];
+        let tgtBalSigner1_ETH = deposit1_ETH / AssetPrices[0];
+        let tgtBalSigner1_BTC = deposit1_BTC / AssetPrices[1];
+        let tgtBalSigner2_BTC = deposit2 / AssetPrices[1];
+        let tgtBalSigner3_ETH = deposit3 / AssetPrices[0];
+        let tgtBalSigner4_BTC = deposit4 / AssetPrices[1];
+        let tgtBalSigner5_MATIC = deposit5 / AssetPrices[2];
 
         // Contract derived balances
         let stratSigner1_ETH = await contract.connect(signer1).getStrategyDetails(signer1.address, targetToken1.address);

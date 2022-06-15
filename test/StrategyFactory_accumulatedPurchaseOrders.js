@@ -138,8 +138,8 @@ describe("accumulatePurchaseOrders()", function () {
                 }
             }
             let accPurchaseOrder = await contract.connect(signer1).accumulatePurchaseOrders(i);
-            assert.equal(parseInt(ethers.utils.formatUnits(accPurchaseOrder[1])), targetToken1Total);
-            assert.equal(parseInt(ethers.utils.formatUnits(accPurchaseOrder[2])), targetToken2Total);
+            assert.equal(parseInt(ethers.utils.formatUnits(accPurchaseOrder[0])), targetToken1Total);
+            assert.equal(parseInt(ethers.utils.formatUnits(accPurchaseOrder[1])), targetToken2Total);
         }
     });
 

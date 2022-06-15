@@ -31,9 +31,11 @@ contract StrategyFactory {
     
     /**
     * @dev Forward and reverse enumerable mappings for available source and target tokens
-    * NOTE: Enumerable mappings are used to allow iteration for modular, multi-asset 
-    * swapping, length method allows proper index assignment for new assets, and fixed memory
-    * array sizing
+    * NOTE: 
+    * - Enumerable mappings are used to allow iteration for modular, multi-asset 
+    *   swapping, length method allows proper index assignment for new assets, and fixed memory
+    *   array sizing
+    * - 
     */ 
     EnumerableMap.AddressToUintMap private sourceTokens;
     EnumerableMap.UintToAddressMap private reverseSourceTokens;
@@ -95,7 +97,7 @@ contract StrategyFactory {
     */
     function setSourceToken(address _token) public onlyOwner {
         require(sourceTokens.contains(_token) == false, "Token address already present in sourceTokens");
-        uint _index = sourceTokens.length() + 1;
+        uint _index = sourceTokens.length();
         require(reverseSourceTokens.contains(_index) == false, "Token index already present in reverseSourceTokens");
         sourceTokens.set(_token, _index);
         reverseSourceTokens.set(_index, _token);
@@ -120,7 +122,7 @@ contract StrategyFactory {
     */
     function setTargetToken(address _token) public onlyOwner {
         require(targetTokens.contains(_token) == false, "Token address already present in targetTokens");
-        uint _index = targetTokens.length() + 1;
+        uint _index = targetTokens.length();
         require(reverseTargetTokens.contains(_index) == false, "Token index already present in reverseTargetTokens");
         targetTokens.set(_token, _index);
         reverseTargetTokens.set(_index, _token);
@@ -144,11 +146,7 @@ contract StrategyFactory {
     * @dev Sums a purchase slot's purchase order for each asset and returns results in an array
     */
     function accumulatePurchaseOrders(uint _purchaseSlot) public view returns (uint[] memory) {
-        uint _length = targetTokens.length() + 1;
-        if(_length < 3) {
-            _length = 3;
-        }
-        uint[] memory _total = new uint[](_length);
+        uint[] memory _total = new uint[](targetTokens.length());
         for(uint i = 0; i < purchaseOrders[_purchaseSlot].length; i++) {
             _total[targetTokens.get(purchaseOrders[_purchaseSlot][i].asset)] += purchaseOrders[_purchaseSlot][i].amount;
         }
@@ -287,13 +285,13 @@ contract StrategyFactory {
     }
 
 
-    /////////// TESTING ///////////
-    /// PLACEHOLDER KEEPERS & SWAP FUNCTIONS ///
+    ////////////////////// TESTING //////////////////////
+    ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
 
     /**
     * @dev [TESTING] placeholder oracle prices for test swapping
     */
-    uint[] public AssetPrices = [0, 2000, 30000, 1]; // null, ETH, BTC, MATIC
+    uint[] public AssetPrices = [2000, 30000, 1]; // null, ETH, BTC, MATIC
 
     /**
     * @dev [TESTING] checkUpkeep keeper integration placeholder function for testing purposes
@@ -317,7 +315,7 @@ contract StrategyFactory {
             uint[] memory _batchPurchaseAmounts = accumulatePurchaseOrders(purchaseSlot);
             uint[] memory _purchased = new uint[](_batchPurchaseAmounts.length);
 
-            for(uint i = 1; i < _batchPurchaseAmounts.length; i++) {
+            for(uint i = 0; i < _batchPurchaseAmounts.length; i++) {
                
                 // [TESTING] If purchase amount for asset > 0, simulate "swap" using fixed asset prices
                 if(_batchPurchaseAmounts[i] > 0) {
@@ -357,8 +355,8 @@ contract StrategyFactory {
         purchaseSlot++;
     }
 
-    /// PLACEHOLDER KEEPERS & SWAP FUNCTIONS ///
-    /////////// TESTING ///////////
+    ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
+    ////////////////////// TESTING //////////////////////
 
 
     /**
