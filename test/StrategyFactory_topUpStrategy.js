@@ -7,7 +7,7 @@ describe("topUpStrategy()", function () {
     // Signer 1 configuration inputs
     const deposit1_ETH = 10000
     const interval1_ETH = 1;
-    const purchase1_ETH = 2500
+    const purchase1_ETH = 2500;
     const topUp1_ETH = 5000;
     const depositAmount1_ETH = ethers.utils.parseUnits(deposit1_ETH.toString(), 18);
     const purchaseAmount1_ETH = ethers.utils.parseUnits(purchase1_ETH.toString(), 18);
@@ -16,7 +16,7 @@ describe("topUpStrategy()", function () {
     // Signer 2 configuration inputs
     const deposit2 = 5000;
     const interval2 = 1;
-    const purchase2 = 2500
+    const purchase2 = 2500;
     const topUp2 = 5000;
     const depositAmount2 = ethers.utils.parseUnits(deposit2.toString(), 18);
     const purchaseAmount2 = ethers.utils.parseUnits(purchase2.toString(), 18);
@@ -25,7 +25,7 @@ describe("topUpStrategy()", function () {
     // Signer 3 configuration inputs
     const deposit3 = 5000;
     const interval3 = 1;
-    const purchase3 = 2000
+    const purchase3 = 2000;
     const topUp3 = 5000;
     const depositAmount3 = ethers.utils.parseUnits(deposit3.toString(), 18);
     const purchaseAmount3 = ethers.utils.parseUnits(purchase3.toString(), 18);
@@ -34,7 +34,7 @@ describe("topUpStrategy()", function () {
     // Signer 4 configuration inputs
     const deposit4 = 5000;
     const interval4 = 7;
-    const purchase4 = 1000
+    const purchase4 = 1000;
     const topUp4 = 2500;
     const depositAmount4 = ethers.utils.parseUnits(deposit4.toString(), 18);
     const purchaseAmount4 = ethers.utils.parseUnits(purchase4.toString(), 18);
@@ -134,7 +134,9 @@ describe("topUpStrategy()", function () {
         await sourceToken.connect(signer1).approve(contract.address, topUp1_ETH);
         await expect(contract.connect(signer1).topUpStrategy(sourceToken.address,
                                                              targetToken2.address,
-                                                             topUp1_ETH)).to.be.reverted;
+                                                             topUp1_ETH))
+                                                             .to.be
+                                                             .revertedWith("Account does not have existing strategy for target asset");
     });
 
     it("Function should increment purchasesRemaining for sourceBalance deposit amount with remainder over purchase amount divisor", async function () {
@@ -157,7 +159,7 @@ describe("topUpStrategy()", function () {
         const purchasesRemaining = ethers.BigNumber.from(strategy.purchasesRemaining).toNumber();
         assert.equal(expectedPurchasesRemaining, purchasesRemaining);
     });
-        
+
     it("Function should emit event on topped up strategy", async function () {
         // Signer 4 initiates strategy in targetToken1
         await sourceToken.connect(signer4).approve(contract.address, depositAmount4);
@@ -178,8 +180,8 @@ describe("topUpStrategy()", function () {
         await expect(contract.connect(signer4).topUpStrategy(sourceToken.address,
                                                              targetToken1.address,
                                                              topUpAmount4,))
-                                                             .to.emit(contract, 'StrategyToppedUp')
-                                                             .withArgs(slotOffset, signer4.address);                                                                   
+                                                             .to.emit(contract, "StrategyToppedUp")
+                                                             .withArgs(signer4.address, slotOffset);                                                                   
     });
 
 });

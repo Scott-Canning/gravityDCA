@@ -65,9 +65,10 @@ contract StrategyFactory {
         uint            purchasesRemaining;
     }
 
-    event StrategyInitiated(uint nextPurchaseSlot, address account);
-    event StrategyToppedUp(uint topUpPurchaseSlot, address account);
+    event StrategyInitiated(address account, uint nextPurchaseSlot);
+    event StrategyToppedUp(address account, uint topUpPurchaseSlot);
     event Deposited(uint timestamp, address from, uint sourceDeposited);
+    event Withdrawal(address account, uint amount);
 
     /**
     * Set owner, Keepers checkUpKeep interval, and last time stamp
@@ -154,21 +155,12 @@ contract StrategyFactory {
     }
 
     /**
-    * @dev Sums a purchase slot's purchase order for each asset and returns results in an array
-    */
-    function depositSource(address _token, uint256 _amount) internal {
-        (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
-        require(success, "Deposit unsuccessful");
-        emit Deposited(block.timestamp, msg.sender, _amount);
-    }
-
-    /**
-    * @dev Initiates new asset specific DCA strategy based on user's configuration
+    * @dev Initiates new DCA strategy based on user's configuration
     * Note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
     * strategy at first interval.
     */
     function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public payable {
-        require(accounts[msg.sender][_targetAsset].purchasesRemaining == 0, "Account has existing strategy for target asset or target asset has not been fully withdrawn");
+        require(accounts[msg.sender][_targetAsset].purchasesRemaining == 0, "Account has existing strategy for target asset");
         require(sourceTokens.contains(_sourceAsset) == true, "Unsupported source asset type");
         require(targetTokens.contains(_targetAsset) == true, "Unsupported target asset type");
         require(_sourceBalance > 0, "Insufficient deposit amount");
@@ -212,7 +204,7 @@ contract StrategyFactory {
                 accounts[msg.sender][_targetAsset].sourceBalance = 0;
             }
         }
-        emit StrategyInitiated(purchaseSlot + _interval, msg.sender);
+        emit StrategyInitiated(msg.sender, purchaseSlot + _interval);
     }
 
     /**
@@ -281,13 +273,33 @@ contract StrategyFactory {
             }
         }
         accounts[msg.sender][_targetAsset].purchasesRemaining += _topUpPurchasesRemaining;
-        emit StrategyToppedUp(_slotOffset, msg.sender);
+        emit StrategyToppedUp(msg.sender, _slotOffset);
+    }
+
+    /**
+    * @dev Sums a purchase slot's purchase order for each asset and returns results in an array
+    */
+    function depositSource(address _token, uint256 _amount) internal {
+        (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+        require(success, "Deposit unsuccessful");
+        emit Deposited(block.timestamp, msg.sender, _amount);
+    }
+
+    /**
+    * @dev Allows users to withdrawal target asset
+    */
+    function withdrawTarget(address _targetAsset, uint _amount) external {
+        require(targetTokens.contains(_targetAsset) == true, "Unsupported target asset type");
+        require(accounts[msg.sender][_targetAsset].targetBalance >= _amount, "Withdrawal amount exceeds target asset balance");
+        accounts[msg.sender][_targetAsset].targetBalance -= _amount;
+        (bool success) = IERC20(_targetAsset).transfer(msg.sender, _amount);
+        require(success, "Withdrawal unsuccessful");
+        emit Withdrawal(msg.sender, _amount);
     }
 
 
     ////////////////////// TESTING //////////////////////
     ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
-
     /**
     * @dev [TESTING] placeholder oracle prices for test swapping
     */
@@ -357,7 +369,6 @@ contract StrategyFactory {
 
     ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
     ////////////////////// TESTING //////////////////////
-
 
     /**
     * NOTE: [TESTING] DAO contract will own contract

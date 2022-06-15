@@ -119,7 +119,9 @@ describe("initNewStrategy()", function () {
                                                   targetToken.address,
                                                   depositAmount1,
                                                   interval1,
-                                                  purchaseAmount1)).to.be.reverted;
+                                                  purchaseAmount1))
+                                                  .to.be
+                                                  .revertedWith("Account has existing strategy for target asset");
     });
 
     it("Function should increment purchasesRemaining for sourceBalance deposit amount with remainder over purchase amount divisor", async function () {
@@ -145,8 +147,8 @@ describe("initNewStrategy()", function () {
                                                                    depositAmount4,
                                                                    interval4,
                                                                    purchaseAmount4))
-                                                                   .to.emit(contract, 'StrategyInitiated')
-                                                                   .withArgs(slot, signer4.address);
+                                                                   .to.emit(contract, "StrategyInitiated")
+                                                                   .withArgs(signer4.address, slot);
     });
 
     it("Function should revert on arbitrary interval input", async function () {
@@ -155,7 +157,9 @@ describe("initNewStrategy()", function () {
                                                                    targetToken.address,
                                                                    depositAmount5,
                                                                    interval5,
-                                                                   purchaseAmount5)).to.be.reverted;
+                                                                   purchaseAmount5))
+                                                                   .to.be
+                                                                   .revertedWith("Unsupported interval");
     });
 
 });

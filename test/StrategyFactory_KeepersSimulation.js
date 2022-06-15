@@ -5,43 +5,43 @@ const { ethers } = require("hardhat");
 describe("Local Keepers Simulation", function () {
     const upKeepInterval = 120;
     // Signer 1 configuration inputs
-    const deposit1_ETH = 10000
+    const deposit1_ETH = 10000;
     const interval1_ETH = 1;
-    const purchase1_ETH = 2500
+    const purchase1_ETH = 2500;
     const depositAmount1_ETH = ethers.utils.parseUnits(deposit1_ETH.toString(), 18);
     const purchaseAmount1_ETH = ethers.utils.parseUnits(purchase1_ETH.toString(), 18);
 
-    const deposit1_BTC = 7500
+    const deposit1_BTC = 7500;
     const interval1_BTC = 7;
-    const purchase1_BTC = 2500
+    const purchase1_BTC = 2500;
     const depositAmount1_BTC = ethers.utils.parseUnits(deposit1_BTC.toString(), 18);
     const purchaseAmount1_BTC = ethers.utils.parseUnits(purchase1_BTC.toString(), 18);
 
     // Signer 2 configuration inputs
     const deposit2 = 5000;
     const interval2 = 1;
-    const purchase2 = 2500
+    const purchase2 = 2500;
     const depositAmount2 = ethers.utils.parseUnits(deposit2.toString(), 18);
     const purchaseAmount2 = ethers.utils.parseUnits(purchase2.toString(), 18);
 
     // Signer 3 configuration inputs
     const deposit3 = 5000;
     const interval3 = 1;
-    const purchase3 = 2000
+    const purchase3 = 2000;
     const depositAmount3 = ethers.utils.parseUnits(deposit3.toString(), 18);
     const purchaseAmount3 = ethers.utils.parseUnits(purchase3.toString(), 18);
 
     // Signer 4 configuration inputs
     const deposit4 = 4000;
     const interval4 = 7;
-    const purchase4 = 1000
+    const purchase4 = 1000;
     const depositAmount4 = ethers.utils.parseUnits(deposit4.toString(), 18);
     const purchaseAmount4 = ethers.utils.parseUnits(purchase4.toString(), 18);
 
     // Signer 5 configuration inputs
     const deposit5 = 5000;
     const interval5 = 14;
-    const purchase5 = 2500
+    const purchase5 = 2500;
     const depositAmount5 = ethers.utils.parseUnits(deposit5.toString(), 18);
     const purchaseAmount5 = ethers.utils.parseUnits(purchase5.toString(), 18);
 

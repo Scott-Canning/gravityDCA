@@ -10,6 +10,10 @@ module.exports = {
   defaultNetwork: "hardhat", 
   networks: {
     hardhat: {
+      forking: {
+        enabled: false,
+        url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.KOVAN_URL}`,
+  }
     },
     kovan: {
       url: process.env.KOVAN_URL,
