@@ -31,8 +31,9 @@ contract StrategyFactory {
     
     /**
     * @dev Forward and reverse enumerable mappings for available source and target tokens
-    * NOTE: enumerable mappings are used to allow iteration for modular swapping function,
-    * length method allows proper index assignment for new assets, and memory array sizing
+    * NOTE: Enumerable mappings are used to allow iteration for modular, multi-asset 
+    * swapping, length method allows proper index assignment for new assets, and fixed memory
+    * array sizing
     */ 
     EnumerableMap.AddressToUintMap private sourceTokens;
     EnumerableMap.UintToAddressMap private reverseSourceTokens;
@@ -63,6 +64,7 @@ contract StrategyFactory {
     }
 
     event StrategyInitiated(uint nextPurchaseSlot, address account);
+    event StrategyToppedUp(uint topUpPurchaseSlot, address account);
     event Deposited(uint timestamp, address from, uint sourceDeposited);
 
     /**
@@ -158,22 +160,23 @@ contract StrategyFactory {
     */
     function depositSource(address _token, uint256 _amount) internal {
         (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
-        require(success, "New strategy deposit unsuccessful");
+        require(success, "Deposit unsuccessful");
         emit Deposited(block.timestamp, msg.sender, _amount);
     }
 
     /**
     * @dev Initiates new asset specific DCA strategy based on user's configuration
-    * Note: Population of the purchaseOrders mapping uses 1 based indexing to initialize 
+    * Note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
     * strategy at first interval.
     */
-    function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public {
+    function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public payable {
         require(accounts[msg.sender][_targetAsset].purchasesRemaining == 0, "Account has existing strategy for target asset or target asset has not been fully withdrawn");
         require(sourceTokens.contains(_sourceAsset) == true, "Unsupported source asset type");
         require(targetTokens.contains(_targetAsset) == true, "Unsupported target asset type");
         require(_sourceBalance > 0, "Insufficient deposit amount");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
-        
+        depositSource(_sourceAsset, _sourceBalance);
+
         // Calculate purchases remaining and account for remainder purchase amounts
         uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
         if((_sourceBalance % _purchaseAmount) > 0) {
@@ -200,15 +203,87 @@ contract StrategyFactory {
         for(uint i = 1; i <= _purchasesRemaining; i++) {
             uint _purchaseSlot = purchaseSlot + (_interval * i);
             if(accounts[msg.sender][_targetAsset].sourceBalance >= accounts[msg.sender][_targetAsset].purchaseAmount) {
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _purchaseAmount, _targetAsset));
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
+                                                                 _purchaseAmount, 
+                                                                 _targetAsset));
                 accounts[msg.sender][_targetAsset].sourceBalance -= _purchaseAmount;
             } else { // Account for remainder purchase amounts
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, accounts[msg.sender][_targetAsset].sourceBalance, _targetAsset));
-                accounts[msg.sender][_targetAsset].sourceBalance -= accounts[msg.sender][_targetAsset].sourceBalance;
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
+                                                                 accounts[msg.sender][_targetAsset].sourceBalance, 
+                                                                 _targetAsset));
+                accounts[msg.sender][_targetAsset].sourceBalance = 0;
             }
         }
-        depositSource(_sourceAsset, _sourceBalance);
         emit StrategyInitiated(purchaseSlot + _interval, msg.sender);
+    }
+
+    /**
+    * @dev Allows users to top up an existing strategy with additional units of the source asset
+    * Note:
+    * - Population of the purchaseOrders mapping uses 0-based indexing to top up an existing
+    *   strategy starting at the _slotOffset
+    * - Function first checks for a purchaseAmount shortfall in the last purchase slot of the 
+    *   user's existing strategy and if one exists, it fills that purchase slot and updates the 
+    * _topUpAmount accordingly
+    */
+    function topUpStrategy(address _sourceAsset, address _targetAsset, uint _topUpAmount) public payable {
+        require(accounts[msg.sender][_targetAsset].purchasesRemaining > 0, "Account does not have existing strategy for target asset");
+        require(sourceTokens.contains(_sourceAsset) == true, "Unsupported source asset type");
+        require(targetTokens.contains(_targetAsset) == true, "Unsupported target asset type");
+        require(_topUpAmount > 0, "Insufficient deposit amount");
+        depositSource(_sourceAsset, _topUpAmount);
+        accounts[msg.sender][_targetAsset].sourceBalance += _topUpAmount;
+
+        // Calculate offset starting point for top up purchases and ending point for existing purchase shortfalls
+        uint _purchaseAmount = accounts[msg.sender][_targetAsset].purchaseAmount;
+        uint _nextSlot = accounts[msg.sender][_targetAsset].nextSlot;
+        uint _purchasesRemaining = accounts[msg.sender][_targetAsset].purchasesRemaining;
+        uint _interval = accounts[msg.sender][_targetAsset].interval;
+        uint _slotOffset = _nextSlot + (_purchasesRemaining * _interval);
+        uint _strategyLastSlot = _slotOffset - _interval;
+
+        // If remainder 'shortfall' below purchaseAmount on final purchase slot of existing strategy, fill
+        for(uint i = 0; i < purchaseOrders[_strategyLastSlot].length; i++) {
+            if(purchaseOrders[_strategyLastSlot][i].user == msg.sender) {
+                if(purchaseOrders[_strategyLastSlot][i].asset == _targetAsset) {
+                    uint _amountLastSlot = purchaseOrders[_strategyLastSlot][i].amount;
+                    if(_amountLastSlot < _purchaseAmount) {
+                        if(_topUpAmount > (_purchaseAmount - _amountLastSlot)) {
+                            _topUpAmount -= (_purchaseAmount - _amountLastSlot);
+                            purchaseOrders[_strategyLastSlot][i].amount = _purchaseAmount;
+                        } else if (_topUpAmount < (_purchaseAmount - _amountLastSlot)) {
+                            purchaseOrders[_strategyLastSlot][i].amount += _topUpAmount;
+                            _topUpAmount = 0;
+                        } else {
+                            purchaseOrders[_strategyLastSlot][i].amount = _purchaseAmount;
+                            _topUpAmount = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        uint _topUpPurchasesRemaining = _topUpAmount / _purchaseAmount;
+        if(_topUpAmount % _purchaseAmount > 0) {
+            _topUpPurchasesRemaining += 1;
+        }
+
+        for(uint i = 0; i < _topUpPurchasesRemaining; i++) {
+            uint _purchaseSlot = _slotOffset + (_interval * i);
+            if(accounts[msg.sender][_targetAsset].sourceBalance >= accounts[msg.sender][_targetAsset].purchaseAmount) {
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
+                                                                 _purchaseAmount, 
+                                                                 _targetAsset));
+                accounts[msg.sender][_targetAsset].sourceBalance -= _purchaseAmount;
+            } else { // Account for remainder purchase amounts
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
+                                                                 accounts[msg.sender][_targetAsset].sourceBalance, 
+                                                                 _targetAsset));
+                accounts[msg.sender][_targetAsset].sourceBalance = 0;
+            }
+        }
+        accounts[msg.sender][_targetAsset].purchasesRemaining += _topUpPurchasesRemaining;
+        emit StrategyToppedUp(_slotOffset, msg.sender);
     }
 
 

@@ -62,7 +62,7 @@ describe("initNewStrategy()", function () {
         await contract.setSourceToken(sourceToken.address);
         await contract.setTargetToken(targetToken.address);
 
-        // Get signers and send source token to signers 2 and 3
+        // Get signers and send source token to signers 2-5
         [signer1, signer2, signer3, signer4, signer5] = await ethers.getSigners();
         const transferAmount1 = ethers.utils.parseUnits("5000", 18);
         await sourceToken.transfer(signer2.address, transferAmount1);
@@ -95,18 +95,18 @@ describe("initNewStrategy()", function () {
                                                             purchaseAmount2);
 
         const contractBalance = await sourceToken.balanceOf(contract.address);
-        const totalDeposits = (deposit1 + deposit2) * 1e18;
-        assert.equal(contractBalance, totalDeposits);
+        const totalDeposits = (deposit1 + deposit2);
+        assert.equal(ethers.utils.formatUnits(contractBalance, 18), totalDeposits);
     });
 
     it("Function should properly populate purchase orders after user initiates strategy", async function () {
-        for(let i = 0; i < (depositAmount1 / purchaseAmount1); i++) {
+        for(let i = 0; i < (deposit1 / purchase1); i++) {
             let purchaseOrders = await contract.getPurchaseOrderDetails(i);
             for(let j = 0; j < purchaseOrders.length; j++) {
                 if(purchaseOrders[j].user === signer1.address) {
-                    let asset = parseInt(purchaseOrders[j].asset);
-                    assert.equal(targetToken.address, asset);
+                    let asset = purchaseOrders[j].asset;
                     let amount = parseInt(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));
+                    assert.equal(targetToken.address, asset);
                     assert.equal(amount, purchase1);
                 }
             }
@@ -132,7 +132,7 @@ describe("initNewStrategy()", function () {
 
         const expectedPurchasesRemaining = Math.round(depositAmount3 / purchaseAmount3)
         const strategy = await contract.getStrategyDetails(signer3.address, targetToken.address);
-        const purchasesRemaining = parseInt(ethers.utils.formatUnits(strategy.purchasesRemaining) * 1e18);
+        const purchasesRemaining = ethers.BigNumber.from(strategy.purchasesRemaining).toNumber();
         assert.equal(expectedPurchasesRemaining, purchasesRemaining);
     });
 
