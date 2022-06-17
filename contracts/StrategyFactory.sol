@@ -17,10 +17,12 @@ contract StrategyFactory is Ownable {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
+
     uint public purchaseSlot;
     uint public lastTimeStamp;
     uint public immutable upKeepInterval;
     
+
     /// @notice Mapping of each user's live strategies for each respective asset 
     mapping (address => mapping (address => Strategy)) public accounts;
 
@@ -38,6 +40,7 @@ contract StrategyFactory is Ownable {
     EnumerableMap.UintToAddressMap private reverseSourceTokens;
     EnumerableMap.AddressToUintMap private targetTokens;
     EnumerableMap.UintToAddressMap private reverseTargetTokens;
+
 
     /// @notice Data type used for slotting a user's future purchase orders
     struct PurchaseOrder {
@@ -59,31 +62,42 @@ contract StrategyFactory is Ownable {
         uint            purchasesRemaining;
     }
 
+
     event StrategyInitiated(address account, uint nextPurchaseSlot);
     event StrategyToppedUp(address account, uint topUpPurchaseSlot);
     event Deposited(uint timestamp, address from, uint sourceDeposited);
     event Withdrawal(address account, uint amount);
 
-    /// @notice Set owner, Keepers checkUpKeep interval, and last time stamp
+
+    /// @notice Set Keepers upkeep interval, and last timestamp
     constructor(uint _upKeepInterval) {
         upKeepInterval = _upKeepInterval;
         lastTimeStamp = block.timestamp;
     }
 
-    /// @notice 'accounts' nested mapping getter
-    /// @return [COMPLETE]
+    /**
+     * @notice 'accounts' nested mapping getter
+     * @param _user the address of user account
+     * @param _targetAsset the address of the strategy's target asset
+     * @return Strategy struct mapped from user's address and a target asset address
+     */
     function getStrategyDetails(address _user, address _targetAsset) public view returns (Strategy memory) {
         return accounts[_user][_targetAsset];
     }
 
-    /// @notice 'purchaseOrders' mapping getter
-    /// @return [COMPLETE]
+    /**
+     * @notice 'purchaseOrders' mapping getter
+     * @param _slot the purchase slot details are being sought for
+     * @return PurchaseOrder array containing all purchase orders of the passed purchase slot
+     */
     function getPurchaseOrderDetails(uint _slot) public view returns (PurchaseOrder[] memory) {
         return purchaseOrders[_slot];
     }
 
-
-    /// @notice 'sourceTokens and reverseSourceTokens' combined setters
+    /**
+     * @notice 'sourceTokens and reverseSourceTokens' combined setters
+     * @param _token the token address the owner seeks to add to the enumerated source token mappings
+     */
     function setSourceToken(address _token) public onlyOwner {
         require(sourceTokens.contains(_token) == false, "Token address already present in sourceTokens");
         uint _index = sourceTokens.length();
@@ -92,19 +106,28 @@ contract StrategyFactory is Ownable {
         reverseSourceTokens.set(_index, _token);
     }
 
-    /// @notice 'sourceTokens' enumerable mapping getter
-    /// @return [COMPLETE]
+    /**
+     * @notice 'sourceTokens' enumerable mapping getter
+     * @param _token the address of the source token an index is being sought for
+     * @return the index of the source token in the enumerated source tokens mapping
+     */
     function getSourceTokenIdx(address _token) public view returns (uint) {
         return sourceTokens.get(_token);
     }
 
-    /// @notice 'reverseSourceTokens' enumerable mapping getter
-    /// @return [COMPLETE]
+    /**
+     * @notice 'reverseSourceTokens' enumerable mapping getter
+     * @param _index the index of the source token an address is being sought for
+     * @return the address of the source token in the enumerated source tokens mapping
+     */
     function getSourceTokenAddr(uint _index) public view returns (address) {
         return reverseSourceTokens.get(_index);
     }
 
-    /// @notice 'targetTokens and reverseTargetTokens' combined setters
+    /**
+     * @notice 'targetTokens and reverseTargetTokens' combined setters
+     * @param _token the token address the owner seeks to add to the enumerated target token mappings
+     */
     function setTargetToken(address _token) public onlyOwner {
         require(targetTokens.contains(_token) == false, "Token address already present in targetTokens");
         uint _index = targetTokens.length();
@@ -113,34 +136,49 @@ contract StrategyFactory is Ownable {
         reverseTargetTokens.set(_index, _token);
     }
 
-
-    /// @notice 'targetTokens' enumerable mapping getter
-    /// @return [COMPLETE]
+    /**
+     * @notice 'targetTokens' enumerable mapping getter
+     * @param _token the address of the target token an index is being sought for
+     * @return the index of the target token in the enumerated target tokens mapping
+     */
     function getTargetTokenIdx(address _token) public view returns (uint) {
         return targetTokens.get(_token);
     }
 
-    /// @notice 'reverseTargetTokens' enumerable mapping getter
-    /// @return [COMPLETE]
+    /**
+     * @notice 'reverseTargetTokens' enumerable mapping getter
+     * @param _index the index of the target token an address is being sought for
+     * @return the address of the target token in the enumerated target tokens mapping
+     */
     function getTargetTokenAddr(uint _index) public view returns (address) {
         return reverseTargetTokens.get(_index);
     }
 
-    /// @notice Sums a purchase slot's purchase order for each asset and returns results in an array
-    /// @return [COMPLETE]
-    function accumulatePurchaseOrders(uint _purchaseSlot) public view returns (uint[] memory) {
+    /**
+     * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
+     * @param _slot the purchase slot accumulated purchase amounts of target assets are being sought for
+     * @return an array of total purchase amounts for a purchase slot where each index corresponds 
+     * to the target asset's respective target token index
+     */
+    function accumulatePurchaseOrders(uint _slot) public view returns (uint[] memory) {
         uint[] memory _total = new uint[](targetTokens.length());
-        for(uint i = 0; i < purchaseOrders[_purchaseSlot].length; i++) {
-            _total[targetTokens.get(purchaseOrders[_purchaseSlot][i].asset)] += purchaseOrders[_purchaseSlot][i].amount;
+        for(uint i = 0; i < purchaseOrders[_slot].length; i++) {
+            _total[targetTokens.get(purchaseOrders[_slot][i].asset)] += purchaseOrders[_slot][i].amount;
         }
         return(_total);
     }
 
+
     /**
-    * @notice Initiates new DCA strategy based on user's configuration
-    * note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
-    * strategy at first interval.
-    */
+     * @notice Initiates new DCA strategy based on user's configuration
+     * @param _sourceAsset [COMPLETE]
+     * @param _targetAsset [COMPLETE]
+     * @param _sourceBalance [COMPLETE]
+     * @param _interval [COMPLETE]
+     * @param _purchaseAmount [COMPLETE]
+     * note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
+     * strategy at first interval.
+     */
     function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public payable {
         require(accounts[msg.sender][_targetAsset].purchasesRemaining == 0, "Account has existing strategy for target asset");
         require(sourceTokens.contains(_sourceAsset) == true, "Unsupported source asset type");
@@ -190,14 +228,17 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-    * @notice Allows users to top up an existing strategy with additional units of the source asset
-    * note:
-    * - Population of the purchaseOrders mapping uses 0-based indexing to top up an existing
-    *   strategy starting at the _slotOffset
-    * - Function first checks for a purchaseAmount shortfall in the last purchase slot of the 
-    *   user's existing strategy and if one exists, it fills that purchase slot and updates the 
-    *   _topUpAmount accordingly
-    */
+     * @notice Allows users to top up an existing strategy with additional units of the source asset
+     * @param _sourceAsset [COMPLETE]
+     * @param _targetAsset [COMPLETE]
+     * @param _topUpAmount [COMPLETE]
+     * note:
+     * - Population of the purchaseOrders mapping uses 0-based indexing to top up an existing
+     *   strategy starting at the _slotOffset
+     * - Function first checks for a purchaseAmount shortfall in the last purchase slot of the 
+     *   user's existing strategy and if one exists, it fills that purchase slot and updates the 
+     *   _topUpAmount accordingly
+     */
     function topUpStrategy(address _sourceAsset, address _targetAsset, uint _topUpAmount) public payable {
         require(accounts[msg.sender][_targetAsset].purchasesRemaining > 0, "Account does not have existing strategy for target asset");
         require(sourceTokens.contains(_sourceAsset) == true, "Unsupported source asset type");
@@ -258,15 +299,22 @@ contract StrategyFactory is Ownable {
         emit StrategyToppedUp(msg.sender, _slotOffset);
     }
 
-
-    /// @notice Sums a purchase slot's purchase order for each asset and returns results in an array
+    /**
+     * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
+     * @param _token [COMPLETE]
+     * @param _amount [COMPLETE]
+     */
     function depositSource(address _token, uint256 _amount) internal {
         (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
         require(success, "Deposit unsuccessful");
         emit Deposited(block.timestamp, msg.sender, _amount);
     }
 
-    /// @notice Allows users to withdrawal target asset
+    /**
+     * @notice Allows users to withdrawal target asset
+     * @param _targetAsset [COMPLETE]
+     * @param _amount [COMPLETE]
+     */
     function withdrawTarget(address _targetAsset, uint _amount) external {
         require(targetTokens.contains(_targetAsset) == true, "Unsupported target asset type");
         require(accounts[msg.sender][_targetAsset].targetBalance >= _amount, "Withdrawal amount exceeds target asset balance");
