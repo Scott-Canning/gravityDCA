@@ -72,13 +72,33 @@ describe("Governance", function () {
         votingPeriod = ethers.BigNumber.from(await governor.votingPeriod()).toNumber();
     });
 
-    it("TimelockController should be owner of the StrategyFactory", async function () {
-        // Grant roles and transition ownership of strategyFactory to Timecontroller
+    it("Modifying initial TimelockController roles via grantRole(PROPOSER, EXECUTOR) and revokeRole(ADMIN) should succeed", async function () {
+        // Grant timelock roles 
         await timelock.grantRole(await timelock.PROPOSER_ROLE(), governor.address);
         await timelock.grantRole(await timelock.EXECUTOR_ROLE(), '0x0000000000000000000000000000000000000000');
+        const govHasPropRole = await timelock.hasRole(timelock.PROPOSER_ROLE(), governor.address);
+        const everyoneHasExecRole = await timelock.hasRole(timelock.EXECUTOR_ROLE(), '0x0000000000000000000000000000000000000000');
+        assert.isTrue(govHasPropRole);
+        assert.isTrue(everyoneHasExecRole);
+
+        // Upon deployment both the deployer and timelock have the admin role, revoke deployer's access
         await timelock.revokeRole(await timelock.TIMELOCK_ADMIN_ROLE(), signer1.address);
+        const timelockHasAdminRole = await timelock.hasRole(timelock.TIMELOCK_ADMIN_ROLE(), timelock.address);
+        const deployerHasAdminRole = await timelock.hasRole(timelock.TIMELOCK_ADMIN_ROLE(), signer1.address);
+        assert.isTrue(timelockHasAdminRole);
+        assert.isFalse(deployerHasAdminRole);
+    });
+
+    it("After revoking ADMIN role, deployer should no longer be capable of modifying TimelockController roles", async function () {
+        await expect(timelock.grantRole(await timelock.PROPOSER_ROLE(), signer1.address)).to.be.reverted;
+        await expect(timelock.grantRole(await timelock.EXECUTOR_ROLE(), signer1.address)).to.be.reverted;
+        await expect(timelock.revokeRole(await timelock.TIMELOCK_ADMIN_ROLE(), signer1.address)).to.be.reverted;
+    });
+    
+
+    it("TimelockController should be owner of the StrategyFactory contract", async function () {
+        // Transition ownership of strategyFactory to Timecontroller
         await strategyFactory.transferOwnership(timelock.address);
-        
         const owner = await strategyFactory.owner();
         assert.equal(owner, timelock.address);
     });
@@ -91,7 +111,7 @@ describe("Governance", function () {
                             .revertedWith( "Ownable: caller is not the owner");
     });
 
-    it("Proposal to set source and target tokens by governor should succesfully execute", async function () {
+    it("Proposal to set source token by governor should successfully execute", async function () {
         await gravToken.delegate(signer1.address, { from: signer1.address })
     
         const contractAddress = strategyFactory.address;
@@ -109,7 +129,7 @@ describe("Governance", function () {
         const proposalId_SetSource = proposeReceipt.events[0].args.proposalId;
 
         // Advance time forward 'votingDelay' blocks to open voting period
-        let endTimestamp = timestamp + (votingDelay * blocktime)
+        let endTimestamp = timestamp + ((votingDelay + 1) * blocktime)
         while(timestamp <= endTimestamp) {
             await ethers.provider.send('evm_increaseTime', [blocktime]);
             await ethers.provider.send('evm_mine');
@@ -117,15 +137,14 @@ describe("Governance", function () {
         }
 
         // Signer 1 votes
-        await governor.connect(signer1).castVote(proposalId_SetSource, 1);
+        let voteTx = await governor.connect(signer1).castVote(proposalId_SetSource, 1);
         
         // Assert state
         let state = await governor.state(proposalId_SetSource);
-        console.log(propState[state]);
         assert.equal(propState[state], "Active");
 
         // Advance time forward 'votingPeriod' blocks (-1 on castVote block increment)
-        endTimestamp = timestamp + ((votingPeriod) * blocktime);
+        endTimestamp = timestamp + (votingPeriod * blocktime);
         while(timestamp < endTimestamp) {
             await ethers.provider.send('evm_increaseTime', [blocktime]);
             await ethers.provider.send('evm_mine');
@@ -138,7 +157,7 @@ describe("Governance", function () {
 
         // Queue proposal in timelock
         const descriptionHash = ethers.utils.id("Proposal #1: Set source token");
-        await governor.queue([contractAddress], [0], [calldata_SetSource], descriptionHash,);
+        const queueTx = await governor.queue([contractAddress], [0], [calldata_SetSource], descriptionHash,);
 
         // Assert state
         state = await governor.state(proposalId_SetSource);
@@ -153,7 +172,7 @@ describe("Governance", function () {
         }
 
         // Execute proposal
-        await governor.execute([contractAddress], [0], [calldata_SetSource], descriptionHash,);
+        const executeTx = await governor.execute([contractAddress], [0], [calldata_SetSource], descriptionHash,);
 
         // Assert state
         state = await governor.state(proposalId_SetSource);
@@ -165,5 +184,80 @@ describe("Governance", function () {
         let sourceTokenAddr = await strategyFactory.getSourceTokenAddr(sourceTokenIndex);
         assert.equal(sourceTokenAddr, sourceTokenAddress);
     });
+
+    it("Proposal to set target token by governor should successfully execute", async function () {
+        await gravToken.delegate(signer1.address, { from: signer1.address })
+    
+        const contractAddress = strategyFactory.address;
+        const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
+        const targetTokenAddress = targetToken.address;
+        const calldata_SetTarget = contract.interface.encodeFunctionData("setTargetToken", [targetTokenAddress]);
+
+        // Propose transaction
+        const proposeTx = await governor.propose([contractAddress],
+                                                 [0],
+                                                 [calldata_SetTarget],
+                                                 "Proposal #1: Set source token",
+                                                );
+        const proposeReceipt = await proposeTx.wait(1);
+        const proposalId_SetTarget = proposeReceipt.events[0].args.proposalId;
+
+        // Advance time forward 'votingDelay' blocks to open voting period
+        let endTimestamp = timestamp + ((votingDelay + 1) * blocktime)
+        while(timestamp <= endTimestamp) {
+            await ethers.provider.send('evm_increaseTime', [blocktime]);
+            await ethers.provider.send('evm_mine');
+            timestamp = await getBlockTimestamp();
+        }
+
+        // Signer 1 votes
+        const voteTx = await governor.connect(signer1).castVote(proposalId_SetTarget, 1);
+        
+        // Assert state
+        let state = await governor.state(proposalId_SetTarget);
+        assert.equal(propState[state], "Active");
+
+        // Advance time forward 'votingPeriod' blocks (-1 on castVote block increment)
+        endTimestamp = timestamp + (votingPeriod * blocktime);
+        while(timestamp < endTimestamp) {
+            await ethers.provider.send('evm_increaseTime', [blocktime]);
+            await ethers.provider.send('evm_mine');
+            timestamp = await getBlockTimestamp();
+        }
+
+        // Assert state
+        state = await governor.state(proposalId_SetTarget);
+        assert.equal(propState[state], "Succeeded");
+
+        // Queue proposal in timelock
+        const descriptionHash = ethers.utils.id("Proposal #1: Set source token");
+        const queueTx = await governor.queue([contractAddress], [0], [calldata_SetTarget], descriptionHash,);
+
+        // Assert state
+        state = await governor.state(proposalId_SetTarget);
+        assert.equal(propState[state], "Queued");
+
+        // Advance block forward 'timelockBlocks'
+        endTimestamp = timestamp + (blocktime * timelockBlocks);
+        while(timestamp <= endTimestamp) {
+            await ethers.provider.send('evm_increaseTime', [blocktime]);
+            await ethers.provider.send('evm_mine');
+            timestamp = await getBlockTimestamp();
+        }
+
+        // Execute proposal
+        const executeTx = await governor.execute([contractAddress], [0], [calldata_SetTarget], descriptionHash,);
+
+        // Assert state
+        state = await governor.state(proposalId_SetTarget);
+        assert.equal(propState[state], "Executed");
+
+        let targetTokenIndex = await strategyFactory.getTargetTokenIdx(targetTokenAddress);
+        assert.equal(targetTokenIndex, 0);
+
+        let targetTokenAddr = await strategyFactory.getTargetTokenAddr(targetTokenIndex);
+        assert.equal(targetTokenAddr, targetTokenAddress);
+    });
+
 
 });

@@ -77,7 +77,7 @@ describe("initNewStrategy()", function () {
         await sourceToken.transfer(signer5.address, transferAmount4);
     });
 
-    it("Contract should have ERC20 source token balance equivalent to amounts deposited for strategy initiations", async function () {
+    it("Contract should have source token balance equivalent to amounts deposited for strategy initiations", async function () {
         // Signer 1 initiates strategy
         await sourceToken.approve(contract.address, depositAmount1);
         await contract.initiateNewStrategy(sourceToken.address,
@@ -99,7 +99,7 @@ describe("initNewStrategy()", function () {
         assert.equal(ethers.utils.formatUnits(contractBalance, 18), totalDeposits);
     });
 
-    it("Function should properly populate purchase orders after user initiates strategy", async function () {
+    it("Function should correctly populate purchase orders after user initiates strategy", async function () {
         for(let i = 0; i < (deposit1 / purchase1); i++) {
             let purchaseOrders = await contract.getPurchaseOrderDetails(i);
             for(let j = 0; j < purchaseOrders.length; j++) {
@@ -161,5 +161,6 @@ describe("initNewStrategy()", function () {
                                                                    .to.be
                                                                    .revertedWith("Unsupported interval");
     });
+
 
 });

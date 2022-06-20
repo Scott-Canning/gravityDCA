@@ -81,7 +81,7 @@ describe("topUpStrategy()", function () {
         await sourceToken.transfer(signer4.address, transferAmount3);
     });
     
-    it("Contract should have ERC20 source token balance equivalent to amounts deposited for strategy initiations and top ups", async function () {
+    it("Contract should have source token balance equivalent to amounts deposited for strategy initiations and top ups", async function () {
         // Signer 1 initiates ETH strategy
         await sourceToken.approve(contract.address, depositAmount1_ETH);
         await contract.initiateNewStrategy(sourceToken.address,
@@ -115,7 +115,7 @@ describe("topUpStrategy()", function () {
         assert.equal(ethers.utils.formatUnits(contractBalance, 18), totalDeposits);
     });
 
-    it("Function should properly populate purchase orders after user tops up existing strategy", async function () {
+    it("Function should correctly populate purchase orders after user tops up existing strategy", async function () {
         for(let i = 0; i < ((deposit1_ETH + topUp1_ETH) / purchase1_ETH); i++) {
             let purchaseOrders = await contract.getPurchaseOrderDetails(i);
             for(let j = 0; j < purchaseOrders.length; j++) {

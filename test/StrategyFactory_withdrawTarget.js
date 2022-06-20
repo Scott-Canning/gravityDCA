@@ -58,18 +58,18 @@ describe("withdrawTarget()", function () {
         // Signer 1 initiates ETH strategy
         await sourceToken.approve(contract.address, depositAmount1_ETH);
         await contract.initiateNewStrategy(sourceToken.address,
-                                            targetToken1.address,
-                                            depositAmount1_ETH,
-                                            interval1_ETH,
-                                            purchaseAmount1_ETH);
+                                           targetToken1.address,
+                                           depositAmount1_ETH,
+                                           interval1_ETH,
+                                           purchaseAmount1_ETH);
 
         // Signer 1 initiates BTC strategy
         await sourceToken.approve(contract.address, depositAmount1_BTC);
         await contract.initiateNewStrategy(sourceToken.address,
-                                            targetToken2.address,
-                                            depositAmount1_BTC,
-                                            interval1_BTC,
-                                            purchaseAmount1_BTC);
+                                           targetToken2.address,
+                                           depositAmount1_BTC,
+                                           interval1_BTC,
+                                           purchaseAmount1_BTC);
 
         // Send withdrawable target tokens to contract
         const transferAmount1 = ethers.utils.parseUnits((deposit1_ETH / AssetPrices[0]).toString(), 18);
@@ -105,8 +105,9 @@ describe("withdrawTarget()", function () {
         const strategy = await contract.getStrategyDetails(signer1.address, targetToken1.address);
         const targetBalance = strategy.targetBalance;
         assert.isTrue(amount > targetBalance);
-        await expect(contract.withdrawTarget(targetToken1.address, amount)).to.be
-                                                                           .revertedWith("Withdrawal amount exceeds target asset balance");
+        await expect(contract.withdrawTarget(targetToken1.address, amount))
+                                             .to.be
+                                             .revertedWith("Withdrawal amount exceeds target asset balance");
     });
 
     // Naive local test (send targetToken1 balance to contract for user to withdraw)

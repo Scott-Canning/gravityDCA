@@ -15,10 +15,18 @@ contract Universe is Governor, GovernorCountingSimple, GovernorVotes, GovernorVo
         GovernorTimelockControl(_timelock)
     {}
 
+    /**
+     * @dev The delay before voting on a proposal may take place, once proposed
+     * @return [TESTING] value
+     */
     function votingDelay() public pure override returns (uint256) {
-        return 3; // blocks
+        return 3; //  blocks
     }
 
+    /**
+     * @dev The duration of voting on a proposal
+     * @return [TESTING] value
+     */
     function votingPeriod() public pure override returns (uint256) {
         return 50; // blocks
     }

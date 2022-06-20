@@ -17,18 +17,33 @@ contract StrategyFactory is Ownable {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-
     uint public purchaseSlot;
     uint public lastTimeStamp;
     uint public immutable upKeepInterval;
-    
 
-    /// @notice Mapping of each user's live strategies for each respective asset 
+    /**
+    * @notice Mapping of each user's live strategy for each respective asset 
+    * ( user account => ( target asset => strategy configuration ) )
+    */ 
     mapping (address => mapping (address => Strategy)) public accounts;
-
     
-    /// @notice Mapping for each purchase slot's purchase order array
+    /**
+    * @notice Mapping for each purchase slot's purchase order array
+    * ( day's purchase slot => purchase order array )
+    */     
     mapping (uint => PurchaseOrder[]) public purchaseOrders;
+
+    /**
+    * @notice Fee mapping to strategy duration
+    * ( strategy duration in days (i.e. slots) => fee )
+    */     
+    mapping (uint => uint) public durationFee;
+
+    /**
+    * @notice Fee mapping to strategy purchase interval
+    * ( strategy interval in days (i.e. slots) => fee )
+    */     
+    mapping (uint => uint) public intervalFee;
     
     /**
     * @notice Forward and reverse enumerable mappings for available source and target tokens
@@ -41,14 +56,12 @@ contract StrategyFactory is Ownable {
     EnumerableMap.AddressToUintMap private targetTokens;
     EnumerableMap.UintToAddressMap private reverseTargetTokens;
 
-
     /// @notice Data type used for slotting a user's future purchase orders
     struct PurchaseOrder {
         address         user;
         uint            amount;
         address         asset;
     }
-
 
     /// @notice Data type used for tracking a user's current DCA strategy
     struct Strategy {
@@ -62,12 +75,10 @@ contract StrategyFactory is Ownable {
         uint            purchasesRemaining;
     }
 
-
     event StrategyInitiated(address account, uint nextPurchaseSlot);
     event StrategyToppedUp(address account, uint topUpPurchaseSlot);
     event Deposited(uint timestamp, address from, uint sourceDeposited);
     event Withdrawal(address account, uint amount);
-
 
     /// @notice Set Keepers upkeep interval, and last timestamp
     constructor(uint _upKeepInterval) {
@@ -152,6 +163,24 @@ contract StrategyFactory is Ownable {
      */
     function getTargetTokenAddr(uint _index) public view returns (address) {
         return reverseTargetTokens.get(_index);
+    }
+
+    /**
+     * @notice fee setter for strategy durations
+     * @param _duration [COMPLETE]
+     * @param _fee [COMPLETE]
+     */
+    function setDurationFee(uint _duration, uint _fee) public onlyOwner {
+        durationFee[_duration] = _fee;
+    }
+
+    /**
+     * @notice fee setter for strategy durations
+     * @param _interval [COMPLETE]
+     * @param _fee [COMPLETE]
+     */
+    function setIntervalFee(uint _interval, uint _fee) public onlyOwner {
+        intervalFee[_interval] = _fee;
     }
 
     /**
