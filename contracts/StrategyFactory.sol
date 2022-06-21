@@ -277,13 +277,14 @@ contract StrategyFactory is Ownable {
                             _balance = 0;
                         }
                     }
+                    break; // Break loop once strategy is found
                 }
             }
         }
 
         uint _topUpPurchasesRemaining = _balance / _purchaseAmount;
         uint _remainder;
-        if(_balance % _purchaseAmount > 0) {
+        if((_topUpPurchasesRemaining > 0) && (_balance % _purchaseAmount > 0)) {
             _remainder = _balance - (_topUpPurchasesRemaining * _purchaseAmount);
             _topUpPurchasesRemaining += 1;
         }
@@ -291,7 +292,7 @@ contract StrategyFactory is Ownable {
         uint _purchaseSlot = _slotOffset;
         for(uint i = 0; i < _topUpPurchasesRemaining; i++) {
             _purchaseSlot = _slotOffset + (strategy.interval * i);
-            if(_topUpPurchasesRemaining == i && _remainder > 0) {
+            if((_topUpPurchasesRemaining - 1) == i && _remainder > 0) {
                 purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
                                                                _remainder, 
                                                                _targetAsset));

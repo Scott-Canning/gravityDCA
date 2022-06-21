@@ -11,7 +11,7 @@ contract Universe is Governor, GovernorCountingSimple, GovernorVotes, GovernorVo
     constructor(IVotes _token, TimelockController _timelock)
         Governor("Universe")
         GovernorVotes(_token)
-        GovernorVotesQuorumFraction(4)
+        GovernorVotesQuorumFraction(50)
         GovernorTimelockControl(_timelock)
     {}
 

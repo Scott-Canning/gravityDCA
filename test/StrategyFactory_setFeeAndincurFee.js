@@ -8,14 +8,16 @@ async function getBlockTimestamp() {
     return block.timestamp;
 }
 
-describe("incurFee()", function () {
+describe("setFee() and incurFee()", function () {
     const upKeepInterval = 120;
     // Signer 1 configuration inputs
     const deposit1 = 10000
     const interval1 = 1;
     const purchase1 = 2500
+    const topUp1 = 5000;
     const depositAmount1 = ethers.utils.parseUnits(deposit1.toString(), 18);
     const purchaseAmount1 = ethers.utils.parseUnits(purchase1.toString(), 18);
+    const topUpAmount1 = ethers.utils.parseUnits(topUp1.toString(), 18);
 
     const blocktime = 14;
     const timelockBlocks = 5;
@@ -164,6 +166,7 @@ describe("incurFee()", function () {
 
     it("Incurring a fee for initiating a new strategy should increase the treasury's balance and decrease the strategy's scheduled balance by the same amount", async function () {
         // Signer 1 initiates strategy
+
         await sourceToken.approve(strategyFactory.address, depositAmount1);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
                                                   targetToken.address,
@@ -176,7 +179,7 @@ describe("incurFee()", function () {
         assert.equal(treasuryBalance, (feeValue * deposit1 / 100));
 
         let scheduledBalance = 0;
-        for(let i = 0; i < (deposit1 / purchase1) + 1; i++) {
+        for(let i = 1; i <= (deposit1 / purchase1); i++) {
             let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
             for(let j = 0; j < purchaseOrders.length; j++) {
                 if(purchaseOrders[j].user === signer1.address) {
@@ -185,6 +188,29 @@ describe("incurFee()", function () {
             }
         }
         assert.equal(scheduledBalance + treasuryBalance, deposit1);
+    });
+
+    it("Incurring a fee for topping up an existing strategy should increase the treasury's balance and decrease the strategy's scheduled balance by the same amount", async function () {        
+        // Signer 1 tops up existing strategy
+        const treasuryBalanceBefore = parseFloat(ethers.utils.formatUnits(await strategyFactory.treasury(), 18));
+        await sourceToken.approve(strategyFactory.address, topUpAmount1);
+        await strategyFactory.topUpStrategy(sourceToken.address,
+                                            targetToken.address,
+                                            topUpAmount1);
+        const treasuryBalanceAfter = parseFloat(ethers.utils.formatUnits(await strategyFactory.treasury(), 18));
+        const feeValue = parseFloat(ethers.utils.formatUnits(await strategyFactory.fee(), 18));
+        assert.equal((treasuryBalanceAfter - treasuryBalanceBefore), (feeValue * topUp1 / 100));
+                
+        let scheduledBalance = 0;
+        for(let i = 1; i <= Math.round((deposit1 +  topUp1) / purchase1); i++) {
+            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
+            for(let j = 0; j < purchaseOrders.length; j++) {
+                if(purchaseOrders[j].user === signer1.address) {
+                    scheduledBalance += parseFloat(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));
+                }
+            }
+        }
+        assert.equal((scheduledBalance + treasuryBalanceAfter), (deposit1 + topUp1));
     });
 
 });
