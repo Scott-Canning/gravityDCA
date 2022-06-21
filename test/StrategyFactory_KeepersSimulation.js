@@ -2,7 +2,7 @@ const { assert } = require("chai");
 const { ethers } = require("hardhat");
 
 
-describe("Local Keepers Simulation", function () {
+describe("Local Upkeep Simulation", function () {
     const upKeepInterval = 120;
     // Signer 1 configuration inputs
     const deposit1_ETH = 10000;

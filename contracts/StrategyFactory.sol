@@ -20,6 +20,8 @@ contract StrategyFactory is Ownable {
     uint public purchaseSlot;
     uint public lastTimeStamp;
     uint public immutable upKeepInterval;
+    uint public fee;
+    uint public treasury;
 
     /**
     * @notice Mapping of each user's live strategy for each respective asset 
@@ -33,18 +35,6 @@ contract StrategyFactory is Ownable {
     */     
     mapping (uint => PurchaseOrder[]) public purchaseOrders;
 
-    /**
-    * @notice Fee mapping to strategy duration
-    * ( strategy duration in days (i.e. slots) => fee )
-    */     
-    mapping (uint => uint) public durationFee;
-
-    /**
-    * @notice Fee mapping to strategy purchase interval
-    * ( strategy interval in days (i.e. slots) => fee )
-    */     
-    mapping (uint => uint) public intervalFee;
-    
     /**
     * @notice Forward and reverse enumerable mappings for available source and target tokens
     * note: Enumerable mappings are used to allow iteration for modular, multi-asset 
@@ -166,24 +156,6 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice fee setter for strategy durations
-     * @param _duration [COMPLETE]
-     * @param _fee [COMPLETE]
-     */
-    function setDurationFee(uint _duration, uint _fee) public onlyOwner {
-        durationFee[_duration] = _fee;
-    }
-
-    /**
-     * @notice fee setter for strategy durations
-     * @param _interval [COMPLETE]
-     * @param _fee [COMPLETE]
-     */
-    function setIntervalFee(uint _interval, uint _fee) public onlyOwner {
-        intervalFee[_interval] = _fee;
-    }
-
-    /**
      * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
      * @param _slot the purchase slot accumulated purchase amounts of target assets are being sought for
      * @return an array of total purchase amounts for a purchase slot where each index corresponds 
@@ -197,28 +169,33 @@ contract StrategyFactory is Ownable {
         return(_total);
     }
 
-
     /**
      * @notice Initiates new DCA strategy based on user's configuration
-     * @param _sourceAsset [COMPLETE]
-     * @param _targetAsset [COMPLETE]
-     * @param _sourceBalance [COMPLETE]
-     * @param _interval [COMPLETE]
-     * @param _purchaseAmount [COMPLETE]
+     * @param _sourceAsset deposited asset the user's strategy will use to fund future purchases
+     * @param _targetAsset asset the user's strategy will be purchasing
+     * @param _sourceBalance deposit amount of the source asset
+     * @param _interval defines daily cadence of target asset purchases
+     * @param _purchaseAmount defines amount to be purchased at each interval
      * note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
      * strategy at first interval.
      */
     function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public payable {
         require(accounts[msg.sender][_targetAsset].purchasesRemaining == 0, "Account has existing strategy for target asset");
-        require(sourceTokens.contains(_sourceAsset) == true, "Unsupported source asset type");
-        require(targetTokens.contains(_targetAsset) == true, "Unsupported target asset type");
+        require(sourceTokens.contains(_sourceAsset) == true && targetTokens.contains(_targetAsset) == true, "Unsupported asset type");
         require(_sourceBalance > 0, "Insufficient deposit amount");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
         depositSource(_sourceAsset, _sourceBalance);
 
+        // Incur fee
+        // [LEFT OFF] NEED TO REFLECT FEE IN NEW SOURCE BALANCE
+        uint _balance = _sourceBalance;
+        if(fee > 0) {
+            _balance = incurFee(_sourceBalance);
+        }
+
         // Calculate purchases remaining and account for remainder purchase amounts
-        uint _purchasesRemaining = _sourceBalance / _purchaseAmount;
-        if((_sourceBalance % _purchaseAmount) > 0) {
+        uint _purchasesRemaining = _balance / _purchaseAmount;
+        if((_balance % _purchaseAmount) > 0) {
             _purchasesRemaining += 1;
         }
 
@@ -231,7 +208,7 @@ contract StrategyFactory is Ownable {
         accounts[msg.sender][_targetAsset] = Strategy(purchaseSlot + _interval,
                                                       _sourceAsset,
                                                       _targetAsset,
-                                                      _sourceBalance,
+                                                      _balance,
                                                       0,
                                                       _interval,
                                                       _purchaseAmount,
@@ -270,8 +247,7 @@ contract StrategyFactory is Ownable {
      */
     function topUpStrategy(address _sourceAsset, address _targetAsset, uint _topUpAmount) public payable {
         require(accounts[msg.sender][_targetAsset].purchasesRemaining > 0, "Account does not have existing strategy for target asset");
-        require(sourceTokens.contains(_sourceAsset) == true, "Unsupported source asset type");
-        require(targetTokens.contains(_targetAsset) == true, "Unsupported target asset type");
+        require(sourceTokens.contains(_sourceAsset) == true && targetTokens.contains(_targetAsset) == true, "Unsupported asset type");
         require(_topUpAmount > 0, "Insufficient deposit amount");
         depositSource(_sourceAsset, _topUpAmount);
         accounts[msg.sender][_targetAsset].sourceBalance += _topUpAmount;
@@ -351,6 +327,24 @@ contract StrategyFactory is Ownable {
         (bool success) = IERC20(_targetAsset).transfer(msg.sender, _amount);
         require(success, "Withdrawal unsuccessful");
         emit Withdrawal(msg.sender, _amount);
+    }
+
+    /**
+     * @notice [TESTING] FEE
+     * @param _fee fee value
+     */
+    function setFee(uint _fee) public onlyOwner {
+        fee = _fee;
+    }
+
+    /**
+     * @notice [TESTING] FEE
+     * @param _balance [COMPLETE]
+     */
+    function incurFee(uint _balance) internal returns (uint) {
+        uint _feeIncurred = _balance * fee / 100e18;
+        treasury += _feeIncurred;
+        return _balance - _feeIncurred;
     }
 
     /////////////////////////////////////////////////////

@@ -95,7 +95,6 @@ describe("Governance", function () {
         await expect(timelock.revokeRole(await timelock.TIMELOCK_ADMIN_ROLE(), signer1.address)).to.be.reverted;
     });
     
-
     it("TimelockController should be owner of the StrategyFactory contract", async function () {
         // Transition ownership of strategyFactory to Timecontroller
         await strategyFactory.transferOwnership(timelock.address);
