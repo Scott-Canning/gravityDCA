@@ -31,6 +31,14 @@ contract Universe is Governor, GovernorCountingSimple, GovernorVotes, GovernorVo
         return 50; // blocks
     }
 
+    /**
+     * @dev Token ownership percentage required to propose
+     * @return [TESTING] value
+     */
+    function proposalThreshold() public pure override returns (uint256) {
+        return 10000e18;
+    }
+
     // The following functions are overrides required by Solidity.
     function quorum(uint256 blockNumber)
         public

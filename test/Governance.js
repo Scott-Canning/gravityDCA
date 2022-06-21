@@ -15,7 +15,7 @@ describe("Governance", function () {
     const minDelay = blocktime * timelockBlocks;
 
     let sourceToken, targetToken, strategyFactory, gravToken, 
-        timelock, governor, signer1, votingDelay, votingPeriod,
+        timelock, governor, signer1, signer2, votingDelay, votingPeriod,
         blockNum, block, timestamp;
 
     let propState = [
@@ -35,7 +35,7 @@ describe("Governance", function () {
         timestamp = block.timestamp;
 
         // Get signers and send source token to signers 2-5
-        [signer1] = await ethers.getSigners();
+        [ signer1, signer2 ] = await ethers.getSigners();
 
         // Deploy ERC20 source token
         const SourceToken = await ethers.getContractFactory("SourceToken");
@@ -112,7 +112,6 @@ describe("Governance", function () {
 
     it("Proposal to set source token by governor should successfully execute", async function () {
         await gravToken.delegate(signer1.address, { from: signer1.address })
-    
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const sourceTokenAddress = sourceToken.address;
@@ -186,7 +185,6 @@ describe("Governance", function () {
 
     it("Proposal to set target token by governor should successfully execute", async function () {
         await gravToken.delegate(signer1.address, { from: signer1.address })
-    
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const targetTokenAddress = targetToken.address;
@@ -196,7 +194,7 @@ describe("Governance", function () {
         const proposeTx = await governor.propose([contractAddress],
                                                  [0],
                                                  [calldata_SetTarget],
-                                                 "Proposal #1: Set source token",
+                                                 "Proposal #2: Set target token",
                                                 );
         const proposeReceipt = await proposeTx.wait(1);
         const proposalId_SetTarget = proposeReceipt.events[0].args.proposalId;
@@ -229,7 +227,7 @@ describe("Governance", function () {
         assert.equal(propState[state], "Succeeded");
 
         // Queue proposal in timelock
-        const descriptionHash = ethers.utils.id("Proposal #1: Set source token");
+        const descriptionHash = ethers.utils.id("Proposal #2: Set target token");
         const queueTx = await governor.queue([contractAddress], [0], [calldata_SetTarget], descriptionHash,);
 
         // Assert state
@@ -258,5 +256,30 @@ describe("Governance", function () {
         assert.equal(targetTokenAddr, targetTokenAddress);
     });
 
+
+    it("Proposal transaction should revert if token count is below proposal threshold", async function () {
+        // Signer 1 transfers governance tokens, falling below 10,000 proposal threshold
+        const transfer = ethers.utils.parseUnits("9999000", 18);
+        await gravToken.transfer(signer2.address, transfer);
+        
+        // Deploy ERC20 target token 2
+        const TargetToken2 = await ethers.getContractFactory("TargetToken");
+        const targetToken2 = await TargetToken2.deploy();
+        await targetToken2.deployed();
+
+        await gravToken.delegate(signer1.address, { from: signer1.address })
+        const contractAddress = strategyFactory.address;
+        const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
+        const targetTokenAddress = targetToken2.address;
+        const calldata_SetTarget = contract.interface.encodeFunctionData("setTargetToken", [targetTokenAddress]);
+
+        // Propose transaction
+        await expect(governor.propose([contractAddress],
+                                      [0],
+                                      [calldata_SetTarget],
+                                      "Proposal #3: Set target token",))
+                                      .to.be
+                                      .revertedWith("Governor: proposer votes below proposal threshold");
+    });
 
 });
