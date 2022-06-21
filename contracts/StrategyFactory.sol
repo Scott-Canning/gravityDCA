@@ -56,7 +56,7 @@ contract StrategyFactory is Ownable {
     /// @notice Data type used for tracking a user's current DCA strategy
     struct Strategy {
         uint            nextSlot;
-        address         sourceAsset;
+        // address         sourceAsset;
         address         targetAsset;
         uint            sourceBalance;
         uint            targetBalance;
@@ -166,7 +166,7 @@ contract StrategyFactory is Ownable {
         for(uint i = 0; i < purchaseOrders[_slot].length; i++) {
             _total[targetTokens.get(purchaseOrders[_slot][i].asset)] += purchaseOrders[_slot][i].amount;
         }
-        return(_total);
+        return _total;
     }
 
     /**
@@ -187,15 +187,14 @@ contract StrategyFactory is Ownable {
         depositSource(_sourceAsset, _sourceBalance);
 
         // Incur fee
-        // [LEFT OFF] NEED TO REFLECT FEE IN NEW SOURCE BALANCE
         uint _balance = _sourceBalance;
-        if(fee > 0) {
-            _balance = incurFee(_sourceBalance);
-        }
+        if(fee > 0) _balance = incurFee(_sourceBalance);
 
         // Calculate purchases remaining and account for remainder purchase amounts
         uint _purchasesRemaining = _balance / _purchaseAmount;
+        uint _remainder;
         if((_balance % _purchaseAmount) > 0) {
+            _remainder = _balance - (_purchasesRemaining * _purchaseAmount);
             _purchasesRemaining += 1;
         }
 
@@ -206,7 +205,6 @@ contract StrategyFactory is Ownable {
         }
 
         accounts[msg.sender][_targetAsset] = Strategy(purchaseSlot + _interval,
-                                                      _sourceAsset,
                                                       _targetAsset,
                                                       _balance,
                                                       0,
@@ -216,20 +214,20 @@ contract StrategyFactory is Ownable {
                                                       );
 
         // Populate purchaseOrders mapping
+        uint _currentSlot = purchaseSlot;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _purchaseSlot = purchaseSlot + (_interval * i);
-            if(accounts[msg.sender][_targetAsset].sourceBalance >= accounts[msg.sender][_targetAsset].purchaseAmount) {
+            uint _purchaseSlot = _currentSlot + (_interval * i);
+            if(_purchasesRemaining == i && _remainder > 0) {
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
+                                                                 _remainder, 
+                                                                 _targetAsset));
+            } else {
                 purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
                                                                  _purchaseAmount, 
                                                                  _targetAsset));
-                accounts[msg.sender][_targetAsset].sourceBalance -= _purchaseAmount;
-            } else { // Account for remainder purchase amounts
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
-                                                                 accounts[msg.sender][_targetAsset].sourceBalance, 
-                                                                 _targetAsset));
-                accounts[msg.sender][_targetAsset].sourceBalance = 0;
             }
         }
+        accounts[msg.sender][_targetAsset].sourceBalance = 0;
         emit StrategyInitiated(msg.sender, purchaseSlot + _interval);
     }
 
@@ -252,13 +250,15 @@ contract StrategyFactory is Ownable {
         depositSource(_sourceAsset, _topUpAmount);
         accounts[msg.sender][_targetAsset].sourceBalance += _topUpAmount;
 
+        // Incur fee
+        uint _balance = _topUpAmount;
+        if(fee > 0) _balance = incurFee(_topUpAmount);
+
         // Calculate offset starting point for top up purchases and ending point for existing purchase shortfalls
-        uint _purchaseAmount = accounts[msg.sender][_targetAsset].purchaseAmount;
-        uint _nextSlot = accounts[msg.sender][_targetAsset].nextSlot;
-        uint _purchasesRemaining = accounts[msg.sender][_targetAsset].purchasesRemaining;
-        uint _interval = accounts[msg.sender][_targetAsset].interval;
-        uint _slotOffset = _nextSlot + (_purchasesRemaining * _interval);
-        uint _strategyLastSlot = _slotOffset - _interval;
+        Strategy storage strategy = accounts[msg.sender][_targetAsset];
+        uint _purchaseAmount = strategy.purchaseAmount;
+        uint _slotOffset = strategy.nextSlot + (strategy.purchasesRemaining * strategy.interval);
+        uint _strategyLastSlot = _slotOffset - strategy.interval;
 
         // If remainder 'shortfall' below purchaseAmount on final purchase slot of existing strategy, fill
         for(uint i = 0; i < purchaseOrders[_strategyLastSlot].length; i++) {
@@ -266,42 +266,44 @@ contract StrategyFactory is Ownable {
                 if(purchaseOrders[_strategyLastSlot][i].asset == _targetAsset) {
                     uint _amountLastSlot = purchaseOrders[_strategyLastSlot][i].amount;
                     if(_amountLastSlot < _purchaseAmount) {
-                        if(_topUpAmount > (_purchaseAmount - _amountLastSlot)) {
-                            _topUpAmount -= (_purchaseAmount - _amountLastSlot);
+                        if(_balance > (_purchaseAmount - _amountLastSlot)) {
+                            _balance -= (_purchaseAmount - _amountLastSlot);
                             purchaseOrders[_strategyLastSlot][i].amount = _purchaseAmount;
-                        } else if (_topUpAmount < (_purchaseAmount - _amountLastSlot)) {
-                            purchaseOrders[_strategyLastSlot][i].amount += _topUpAmount;
-                            _topUpAmount = 0;
+                        } else if (_balance < (_purchaseAmount - _amountLastSlot)) {
+                            purchaseOrders[_strategyLastSlot][i].amount += _balance;
+                            _balance = 0;
                         } else {
                             purchaseOrders[_strategyLastSlot][i].amount = _purchaseAmount;
-                            _topUpAmount = 0;
+                            _balance = 0;
                         }
                     }
                 }
             }
         }
 
-        uint _topUpPurchasesRemaining = _topUpAmount / _purchaseAmount;
-        if(_topUpAmount % _purchaseAmount > 0) {
+        uint _topUpPurchasesRemaining = _balance / _purchaseAmount;
+        uint _remainder;
+        if(_balance % _purchaseAmount > 0) {
+            _remainder = _balance - (_topUpPurchasesRemaining * _purchaseAmount);
             _topUpPurchasesRemaining += 1;
         }
 
+        uint _purchaseSlot = _slotOffset;
         for(uint i = 0; i < _topUpPurchasesRemaining; i++) {
-            uint _purchaseSlot = _slotOffset + (_interval * i);
-            if(accounts[msg.sender][_targetAsset].sourceBalance >= accounts[msg.sender][_targetAsset].purchaseAmount) {
+            _purchaseSlot = _slotOffset + (strategy.interval * i);
+            if(_topUpPurchasesRemaining == i && _remainder > 0) {
                 purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
-                                                                 _purchaseAmount, 
-                                                                 _targetAsset));
-                accounts[msg.sender][_targetAsset].sourceBalance -= _purchaseAmount;
-            } else { // Account for remainder purchase amounts
+                                                               _remainder, 
+                                                               _targetAsset));
+            } else {
                 purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, 
-                                                                 accounts[msg.sender][_targetAsset].sourceBalance, 
-                                                                 _targetAsset));
-                accounts[msg.sender][_targetAsset].sourceBalance = 0;
+                                                               _purchaseAmount, 
+                                                               _targetAsset));
             }
         }
-        accounts[msg.sender][_targetAsset].purchasesRemaining += _topUpPurchasesRemaining;
-        emit StrategyToppedUp(msg.sender, _slotOffset);
+        strategy.sourceBalance = 0;
+        strategy.purchasesRemaining += _topUpPurchasesRemaining;
+        emit StrategyToppedUp(msg.sender, _balance);
     }
 
     /**

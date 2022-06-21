@@ -168,12 +168,6 @@ describe("topUpStrategy()", function () {
                                                             depositAmount4,
                                                             interval4,
                                                             purchaseAmount4);
-
-        const strategy = await contract.getStrategyDetails(signer4.address, targetToken1.address);
-        const purchasesRemaining = ethers.BigNumber.from(strategy.purchasesRemaining).toNumber()
-        const nextSlot = ethers.BigNumber.from(strategy.nextSlot).toNumber(); 
-        const interval = ethers.BigNumber.from(strategy.interval).toNumber();
-        const slotOffset = nextSlot + (purchasesRemaining * interval);
         
         // Signer 4 topsUp strategy
         await sourceToken.connect(signer4).approve(contract.address, topUpAmount4);
@@ -181,7 +175,17 @@ describe("topUpStrategy()", function () {
                                                              targetToken1.address,
                                                              topUpAmount4,))
                                                              .to.emit(contract, "StrategyToppedUp")
-                                                             .withArgs(signer4.address, slotOffset);                                                                   
+                                                             .withArgs(signer4.address, topUpAmount4);
+    });
+
+    it("Function should correctly update strategy's source balance and purchases remaining", async function () {
+        const strategy = await contract.getStrategyDetails(signer4.address, targetToken1.address);
+        const sourceBalance = ethers.BigNumber.from(strategy.sourceBalance).toNumber()
+        const purchasesRemaining = ethers.BigNumber.from(strategy.purchasesRemaining).toNumber()
+        const expectedPurchasesRemaining = Math.round((deposit4 + topUp4) / purchase4);
+
+        assert.equal(sourceBalance, 0);
+        assert.equal(expectedPurchasesRemaining, purchasesRemaining);
     });
 
 });
