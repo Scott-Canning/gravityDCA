@@ -23,7 +23,7 @@ describe("setFee() and incurFee()", function () {
     const timelockBlocks = 5;
     const minDelay = blocktime * timelockBlocks;
 
-    let sourceToken, targetToken, strategyFactory, gravToken, 
+    let sourceToken, targetToken1, strategyFactory, gravToken, 
         timelock, governor, signer1, votingDelay, votingPeriod,
         blockNum, block, timestamp;
 
@@ -53,8 +53,8 @@ describe("setFee() and incurFee()", function () {
 
         // Deploy ERC20 target token
         const TargetToken = await ethers.getContractFactory("TargetToken");
-        targetToken = await TargetToken.deploy();
-        await targetToken.deployed();
+        targetToken1 = await TargetToken.deploy();
+        await targetToken1.deployed();
 
         // Deploy Strategy Factory contract
         const StrategyFactory = await ethers.getContractFactory("StrategyFactory");
@@ -76,9 +76,8 @@ describe("setFee() and incurFee()", function () {
         governor = await Governor.deploy(gravToken.address, timelock.address);
         await governor.deployed();
 
-        // Set source and target test tokens
-        await strategyFactory.setSourceToken(sourceToken.address);
-        await strategyFactory.setTargetToken(targetToken.address);
+        // Set pair
+        await strategyFactory.setPair(sourceToken.address, targetToken1.address);
 
         // Get voting configuration from governor contract
         votingDelay = ethers.BigNumber.from(await governor.votingDelay()).toNumber();
@@ -166,10 +165,9 @@ describe("setFee() and incurFee()", function () {
 
     it("Incurring a fee for initiating a new strategy should increase the treasury's balance and decrease the strategy's scheduled balance by the same amount", async function () {
         // Signer 1 initiates strategy
-
         await sourceToken.approve(strategyFactory.address, depositAmount1);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                                  targetToken.address,
+                                                  targetToken1.address,
                                                   depositAmount1,
                                                   interval1,
                                                   purchaseAmount1);
@@ -195,7 +193,7 @@ describe("setFee() and incurFee()", function () {
         const treasuryBalanceBefore = parseFloat(ethers.utils.formatUnits(await strategyFactory.treasury(), 18));
         await sourceToken.approve(strategyFactory.address, topUpAmount1);
         await strategyFactory.topUpStrategy(sourceToken.address,
-                                            targetToken.address,
+                                            targetToken1.address,
                                             topUpAmount1);
         const treasuryBalanceAfter = parseFloat(ethers.utils.formatUnits(await strategyFactory.treasury(), 18));
         const feeValue = parseFloat(ethers.utils.formatUnits(await strategyFactory.fee(), 18));

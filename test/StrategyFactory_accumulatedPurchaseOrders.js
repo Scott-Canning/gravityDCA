@@ -3,6 +3,8 @@ const { ethers } = require("hardhat");
 
 
 describe("accumulatePurchaseOrders()", function () {
+    const pairs = {}; // note: imperfect representation of nested map 'pairs' in StrategyFactory.sol (non-DCE)
+    const reversePairs = [];
     const upKeepInterval = 120;
     // Signer 1 configuration inputs
     const deposit1 = 10000;
@@ -39,7 +41,7 @@ describe("accumulatePurchaseOrders()", function () {
     const depositAmount5 = ethers.utils.parseUnits(deposit5.toString(), 18);
     const purchaseAmount5 = ethers.utils.parseUnits(purchase5.toString(), 18);
 
-    let contract, sourceToken, targetToken1, targetToken2, 
+    let strategyFactory, sourceToken, targetToken1, targetToken2, 
         signer1, signer2, signer3, signer4, signer5;
 
     before("Deploy testing tokens and StrategyFactory.sol", async function () { 
@@ -58,15 +60,23 @@ describe("accumulatePurchaseOrders()", function () {
         targetToken2 = await TargetToken2.deploy();
         await targetToken2.deployed();
 
-        // Deploy Strategy Factory contract
+        // Deploy Strategy Factory strategyFactory
         const StrategyFactory = await ethers.getContractFactory("StrategyFactory");
-        contract = await StrategyFactory.deploy(upKeepInterval);
-        await contract.deployed();
+        strategyFactory = await StrategyFactory.deploy(upKeepInterval);
+        await strategyFactory.deployed();
 
-        // Set source and target test tokens
-        await contract.setSourceToken(sourceToken.address);
-        await contract.setTargetToken(targetToken1.address);
-        await contract.setTargetToken(targetToken2.address);
+        // Set pairs
+        await strategyFactory.setPair(sourceToken.address, targetToken1.address);
+        const getPair1Tx = await strategyFactory.getPairId(sourceToken.address, targetToken1.address);
+        const pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
+        pairs[targetToken1.address] = pair1Id;
+        reversePairs[pair1Id] = targetToken1.address;
+
+        await strategyFactory.setPair(sourceToken.address, targetToken2.address);
+        const getPair2Tx = await strategyFactory.getPairId(sourceToken.address, targetToken2.address);
+        const pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
+        pairs[targetToken2.address] = pair2Id;
+        reversePairs[pair2Id] = targetToken2.address;
 
         // Get signers and send source token to signers 2 and 3
         [signer1, signer2, signer3, signer4, signer5] = await ethers.getSigners();
@@ -83,63 +93,66 @@ describe("accumulatePurchaseOrders()", function () {
         await sourceToken.transfer(signer5.address, transferAmount4);
     
         // Signer 1 initiates strategy
-        await sourceToken.approve(contract.address, depositAmount1);
-        await contract.initiateNewStrategy(sourceToken.address,
-                                            targetToken1.address,
-                                            depositAmount1,
-                                            interval1,
-                                            purchaseAmount1);
+        await sourceToken.approve(strategyFactory.address, depositAmount1);
+        await strategyFactory.initiateNewStrategy(sourceToken.address,
+                                                targetToken1.address,
+                                                depositAmount1,
+                                                interval1,
+                                                purchaseAmount1);
 
         // Signer 2 initiates strategy
-        await sourceToken.connect(signer2).approve(contract.address, depositAmount2);
-        await contract.connect(signer2).initiateNewStrategy(sourceToken.address,
-                                                            targetToken2.address,
-                                                            depositAmount2,
-                                                            interval2,
-                                                            purchaseAmount2);
+        await sourceToken.connect(signer2).approve(strategyFactory.address, depositAmount2);
+        await strategyFactory.connect(signer2).initiateNewStrategy(sourceToken.address,
+                                                                targetToken2.address,
+                                                                depositAmount2,
+                                                                interval2,
+                                                                purchaseAmount2);
         
         // Signer 3 initiates strategy
-        await sourceToken.connect(signer3).approve(contract.address, depositAmount3);
-        await contract.connect(signer3).initiateNewStrategy(sourceToken.address,
-                                                            targetToken1.address,
-                                                            depositAmount3,
-                                                            interval3,
-                                                            purchaseAmount3);
+        await sourceToken.connect(signer3).approve(strategyFactory.address, depositAmount3);
+        await strategyFactory.connect(signer3).initiateNewStrategy(sourceToken.address,
+                                                                targetToken1.address,
+                                                                depositAmount3,
+                                                                interval3,
+                                                                purchaseAmount3);
 
         // Signer 4 initiates strategy
-        await sourceToken.connect(signer4).approve(contract.address, depositAmount4);
-        await contract.connect(signer4).initiateNewStrategy(sourceToken.address,
-                                                            targetToken2.address,
-                                                            depositAmount4,
-                                                            interval4,
-                                                            purchaseAmount4);
+        await sourceToken.connect(signer4).approve(strategyFactory.address, depositAmount4);
+        await strategyFactory.connect(signer4).initiateNewStrategy(sourceToken.address,
+                                                                targetToken2.address,
+                                                                depositAmount4,
+                                                                interval4,
+                                                                purchaseAmount4);
 
         // Signer 5 initiates strategy
-        await sourceToken.connect(signer5).approve(contract.address, depositAmount5);
-        await contract.connect(signer5).initiateNewStrategy(sourceToken.address,
-                                                            targetToken1.address,
-                                                            depositAmount5,
-                                                            interval5,
-                                                            purchaseAmount5);
+        await sourceToken.connect(signer5).approve(strategyFactory.address, depositAmount5);
+        await strategyFactory.connect(signer5).initiateNewStrategy(sourceToken.address,
+                                                                targetToken1.address,
+                                                                depositAmount5,
+                                                                interval5,
+                                                                purchaseAmount5);
     });
 
     // Only tests accumulatePurchaseOrders(), i.e., circumvents swapping and thus values should be equivalent
     it("Purchase orders for each slot should be equivalent to total deposits at each slot", async function () {
-        for(let i = 0; i <= (interval5 * (depositAmount5 / purchaseAmount5)); i++) {
-            let purchaseOrders = await contract.connect(signer1).getPurchaseOrderDetails(i);
+        for(let i = 1; i < (interval5 * (depositAmount5 / purchaseAmount5)) + 1; i++) {
+            const purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
             let targetToken1Total = 0;
             let targetToken2Total = 0;
             for(let j = 0; j < purchaseOrders.length; j++) {
-                if(purchaseOrders[j].asset === targetToken1.address) {
-                    targetToken1Total += parseInt(ethers.utils.formatUnits(purchaseOrders[j].amount));
+                if(reversePairs[purchaseOrders[j].pairId] === targetToken1.address) {
+                    targetToken1Total += parseInt(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));
                 }
-                else if (purchaseOrders[j].asset === targetToken2.address) {
-                    targetToken2Total += parseInt(ethers.utils.formatUnits(purchaseOrders[j].amount));
+                else if (reversePairs[purchaseOrders[j].pairId] === targetToken2.address) {
+                    targetToken2Total += parseInt(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));
                 }
             }
-            let accPurchaseOrder = await contract.connect(signer1).accumulatePurchaseOrders(i);
-            assert.equal(parseInt(ethers.utils.formatUnits(accPurchaseOrder[0])), targetToken1Total);
-            assert.equal(parseInt(ethers.utils.formatUnits(accPurchaseOrder[1])), targetToken2Total);
+            const accPurchaseOrder = await strategyFactory.accumulatePurchaseOrders(i);
+            const [ _, t1, t2 ] = accPurchaseOrder; // Note: first index is empty given pairId's are 1-based
+            const _targetToken1Total = parseInt(ethers.utils.formatUnits(t1, 18));
+            const _targetToken2Total = parseInt(ethers.utils.formatUnits(t2, 18));
+            assert.equal(_targetToken1Total, targetToken1Total);
+            assert.equal(_targetToken2Total, targetToken2Total);
         }
     });
 

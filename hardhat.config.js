@@ -13,7 +13,8 @@ module.exports = {
     hardhat: {
       forking: {
         enabled: false,
-        url: `https://eth-mainnet.alchemyapi.io/v2/${process.env.KOVAN_URL}`,
+        url: `${process.env.ETH_URL}`,
+        blockNumber: 31908759,
   }
     },
     kovan: {
