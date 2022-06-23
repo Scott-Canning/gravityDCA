@@ -101,31 +101,31 @@ describe("Governance", function () {
         const owner = await strategyFactory.owner();
         assert.equal(owner, timelock.address);
     });
-    /*
-    it("Attempts to set source and target tokens by non-owner should revert", async function () {
-        await expect(strategyFactory.setSourceToken(sourceToken.address)).to.be
-                            .revertedWith( "Ownable: caller is not the owner");
 
-        await expect(strategyFactory.setTargetToken(targetToken.address)).to.be
-                            .revertedWith( "Ownable: caller is not the owner");
+    it("Attempts to set new pairs by non-owner should revert", async function () {
+        await expect(strategyFactory.setPair(sourceToken.address, targetToken.address))
+                            .to.be.revertedWith( "Ownable: caller is not the owner");
+
+        await expect(strategyFactory.setPair(targetToken.address, sourceToken.address))
+                            .to.be.revertedWith( "Ownable: caller is not the owner");
     });
 
-
-    it("Proposal to set source token by governor should successfully execute", async function () {
+    it("Proposal to set pair by governor with sufficient votes should successfully execute", async function () {
         await gravToken.delegate(signer1.address, { from: signer1.address })
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const sourceTokenAddress = sourceToken.address;
-        const calldata_SetSource = contract.interface.encodeFunctionData("setSourceToken", [sourceTokenAddress]);
+        const targetTokenAddress = targetToken.address;
+        const calldata = contract.interface.encodeFunctionData("setPair", [sourceTokenAddress, targetTokenAddress]);
 
         // Propose transaction
         const proposeTx = await governor.propose([contractAddress],
                                                  [0],
-                                                 [calldata_SetSource],
-                                                 "Proposal #1: Set source token",
+                                                 [calldata],
+                                                 "Proposal #1: Set pair",
                                                  {gasLimit: 850_000});
         const proposeReceipt = await proposeTx.wait(1);
-        const proposalId_SetSource = proposeReceipt.events[0].args.proposalId;
+        const proposalId = proposeReceipt.events[0].args.proposalId;
 
         // Advance time forward 'votingDelay' blocks to open voting period
         let endTimestamp = timestamp + ((votingDelay + 2) * blocktime)
@@ -136,10 +136,10 @@ describe("Governance", function () {
         }
 
         // Signer 1 votes
-        const voteTx = await governor.connect(signer1).castVote(proposalId_SetSource, 1);
+        const voteTx = await governor.connect(signer1).castVote(proposalId, 1);
         
         // Assert state
-        let state = await governor.state(proposalId_SetSource);
+        let state = await governor.state(proposalId);
         assert.equal(propState[state], "Active");
 
         // Advance time forward 'votingPeriod' blocks (-1 on castVote block increment)
@@ -151,15 +151,15 @@ describe("Governance", function () {
         }
 
         // Assert state
-        state = await governor.state(proposalId_SetSource);
+        state = await governor.state(proposalId);
         assert.equal(propState[state], "Succeeded");
 
         // Queue proposal in timelock
-        const descriptionHash = ethers.utils.id("Proposal #1: Set source token");
-        const queueTx = await governor.queue([contractAddress], [0], [calldata_SetSource], descriptionHash);
+        const descriptionHash = ethers.utils.id("Proposal #1: Set pair");
+        const queueTx = await governor.queue([contractAddress], [0], [calldata], descriptionHash);
 
         // Assert state
-        state = await governor.state(proposalId_SetSource);
+        state = await governor.state(proposalId);
         assert.equal(propState[state], "Queued");
 
         // Advance block forward 'timelockBlocks'
@@ -171,90 +171,14 @@ describe("Governance", function () {
         }
 
         // Execute proposal
-        const executeTx = await governor.execute([contractAddress], [0], [calldata_SetSource], descriptionHash);
+        const executeTx = await governor.execute([contractAddress], [0], [calldata], descriptionHash);
 
         // Assert state
-        state = await governor.state(proposalId_SetSource);
+        state = await governor.state(proposalId);
         assert.equal(propState[state], "Executed");
 
-        let sourceTokenIndex = await strategyFactory.getSourceTokenIdx(sourceTokenAddress);
-        assert.equal(sourceTokenIndex, 0);
-
-        let sourceTokenAddr = await strategyFactory.getSourceTokenAddr(sourceTokenIndex);
-        assert.equal(sourceTokenAddr, sourceTokenAddress);
-    });
-
-    it("Proposal to set target token by governor should successfully execute", async function () {
-        await gravToken.delegate(signer1.address, { from: signer1.address })
-        const contractAddress = strategyFactory.address;
-        const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
-        const targetTokenAddress = targetToken.address;
-        const calldata_SetTarget = contract.interface.encodeFunctionData("setTargetToken", [targetTokenAddress]);
-
-        // Propose transaction
-        const proposeTx = await governor.propose([contractAddress],
-                                                 [0],
-                                                 [calldata_SetTarget],
-                                                 "Proposal #2: Set target token",
-                                                );
-        const proposeReceipt = await proposeTx.wait(1);
-        const proposalId_SetTarget = proposeReceipt.events[0].args.proposalId;
-
-        // Advance time forward 'votingDelay' blocks to open voting period
-        let endTimestamp = timestamp + ((votingDelay + 2) * blocktime)
-        while(timestamp <= endTimestamp) {
-            await ethers.provider.send('evm_increaseTime', [blocktime]);
-            await ethers.provider.send('evm_mine');
-            timestamp = await getBlockTimestamp();
-        }
-
-        // Signer 1 votes
-        const voteTx = await governor.connect(signer1).castVote(proposalId_SetTarget, 1);
-        
-        // Assert state
-        let state = await governor.state(proposalId_SetTarget);
-        assert.equal(propState[state], "Active");
-
-        // Advance time forward 'votingPeriod' blocks (-1 on castVote block increment)
-        endTimestamp = timestamp + (votingPeriod * blocktime);
-        while(timestamp < endTimestamp) {
-            await ethers.provider.send('evm_increaseTime', [blocktime]);
-            await ethers.provider.send('evm_mine');
-            timestamp = await getBlockTimestamp();
-        }
-
-        // Assert state
-        state = await governor.state(proposalId_SetTarget);
-        assert.equal(propState[state], "Succeeded");
-
-        // Queue proposal in timelock
-        const descriptionHash = ethers.utils.id("Proposal #2: Set target token");
-        const queueTx = await governor.queue([contractAddress], [0], [calldata_SetTarget], descriptionHash);
-
-        // Assert state
-        state = await governor.state(proposalId_SetTarget);
-        assert.equal(propState[state], "Queued");
-
-        // Advance block forward 'timelockBlocks'
-        endTimestamp = timestamp + (blocktime * timelockBlocks);
-        while(timestamp <= endTimestamp) {
-            await ethers.provider.send('evm_increaseTime', [blocktime]);
-            await ethers.provider.send('evm_mine');
-            timestamp = await getBlockTimestamp();
-        }
-
-        // Execute proposal
-        const executeTx = await governor.execute([contractAddress], [0], [calldata_SetTarget], descriptionHash);
-
-        // Assert state
-        state = await governor.state(proposalId_SetTarget);
-        assert.equal(propState[state], "Executed");
-
-        let targetTokenIndex = await strategyFactory.getTargetTokenIdx(targetTokenAddress);
-        assert.equal(targetTokenIndex, 0);
-
-        let targetTokenAddr = await strategyFactory.getTargetTokenAddr(targetTokenIndex);
-        assert.equal(targetTokenAddr, targetTokenAddress);
+        let pairId = await strategyFactory.getPairId(sourceTokenAddress, targetTokenAddress);
+        assert.equal(pairId, 1);
     });
 
     it("Proposal transaction should revert if token count is below proposal threshold", async function () {
@@ -262,25 +186,20 @@ describe("Governance", function () {
         const transfer = ethers.utils.parseUnits("9999000", 18);
         await gravToken.transfer(signer2.address, transfer);
         
-        // Deploy ERC20 target token 2
-        const TargetToken2 = await ethers.getContractFactory("TargetToken");
-        const targetToken2 = await TargetToken2.deploy();
-        await targetToken2.deployed();
-
         await gravToken.delegate(signer1.address, { from: signer1.address })
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
-        const targetTokenAddress = targetToken2.address;
-        const calldata_SetTarget = contract.interface.encodeFunctionData("setTargetToken", [targetTokenAddress]);
+        const sourceTokenAddress = targetToken.address;
+        const targetTokenAddress = sourceToken.address;
+        const calldata = contract.interface.encodeFunctionData("setPair", [sourceTokenAddress, targetTokenAddress]);
 
         // Propose transaction
         await expect(governor.propose([contractAddress],
                                       [0],
-                                      [calldata_SetTarget],
-                                      "Proposal #3: Set target token",))
+                                      [calldata],
+                                      "Proposal #1: Set pair",))
                                       .to.be
                                       .revertedWith("Governor: proposer votes below proposal threshold");
     });
-    */
 
 });

@@ -110,7 +110,7 @@ contract StrategyFactory is Ownable {
      * @param _fromToken token that funds _toToken purchase
      * @param _toToken token that gets purchased with _fromToken
      */
-    function setPair(address _fromToken, address _toToken) public {
+    function setPair(address _fromToken, address _toToken) public onlyOwner {
         require(pairs[_fromToken][_toToken] == 0, "Pair already exists");
         uint _pairId = reversePairs.length;
         pairs[_fromToken][_toToken] = _pairId;
@@ -146,7 +146,7 @@ contract StrategyFactory is Ownable {
      * @param _fromToken source token address of pair being removed
      * @param _toToken target token address of pair being removed
      */
-    function removePair(address _fromToken, address _toToken) public {
+    function removePair(address _fromToken, address _toToken) public onlyOwner {
         require(pairs[_fromToken][_toToken] > 0, "Pair does not exist");
         uint _pairId = pairs[_fromToken][_toToken];
         delete pairs[_fromToken][_toToken];

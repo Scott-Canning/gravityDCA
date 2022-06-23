@@ -5,6 +5,7 @@ coverage.json
 typechain
 tasks.txt
 /misc
+/scripts
 #Hardhat files
 cache
 artifacts
