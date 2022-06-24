@@ -179,7 +179,7 @@ contract StrategyFactory is Ownable {
     function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public payable {
         uint _pairId = pairs[_sourceAsset][_targetAsset];
         require(_pairId > 0, "Pair does not exist");
-        require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy for pair");
+        require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
         depositSource(_sourceAsset, _sourceBalance);
 

@@ -92,7 +92,6 @@ describe("setFee() and incurFee()", function () {
 
     it("Proposal to set fee by governor should successfully execute", async function () {
         await gravToken.delegate(signer1.address, { from: signer1.address })
-    
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const fee = 0.35; // %

@@ -97,8 +97,8 @@ describe("Local Upkeep Simulation", function () {
         pairs[targetToken3.address] = pair3Id;
         reversePairs[pair3Id] = targetToken3.address;
 
-        // Get signers and send source token to signers 2 and 3
-        [signer1, signer2, signer3, signer4, signer5] = await ethers.getSigners();
+        // Get signers and send source token to other signers
+        [ signer1, signer2, signer3, signer4, signer5 ] = await ethers.getSigners();
         const transferAmount1 = ethers.utils.parseUnits("5000", 18);
         await sourceToken.transfer(signer2.address, transferAmount1);
 

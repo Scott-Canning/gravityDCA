@@ -40,7 +40,7 @@ describe("initNewStrategy()", function () {
     const depositAmount5 = ethers.utils.parseUnits(deposit5.toString(), 18);
     const purchaseAmount5 = ethers.utils.parseUnits(purchase5.toString(), 18);
 
-    let strategyFactory, sourceToken, targetToken1, 
+    let strategyFactory, sourceToken, targetToken1, targetToken2, targetToken3,
         signer1, signer2, signer3, signer4, signer5;
     
     before("Deploy testing tokens and StrategyFactory.sol", async function () { 
@@ -50,23 +50,38 @@ describe("initNewStrategy()", function () {
         await sourceToken.deployed();
 
         // Deploy ERC20 target token
-        const TargetToken = await ethers.getContractFactory("TargetToken");
-        targetToken1 = await TargetToken.deploy();
+        const TargetToken1 = await ethers.getContractFactory("TargetToken");
+        targetToken1 = await TargetToken1.deploy();
         await targetToken1.deployed();
 
+        // Deploy ERC20 target token 2
+        const TargetToken2 = await ethers.getContractFactory("TargetToken");
+        targetToken2 = await TargetToken2.deploy();
+        await targetToken2.deployed();
+
+        // Deploy ERC20 target token 3
+        const TargetToken3 = await ethers.getContractFactory("TargetToken");
+        targetToken3 = await TargetToken3.deploy();
+        await targetToken3.deployed();
+        
         // Deploy Strategy Factory strategyFactory
         const StrategyFactory = await ethers.getContractFactory("StrategyFactory");
         strategyFactory = await StrategyFactory.deploy(upKeepInterval);
         await strategyFactory.deployed();
 
-        // Set pair
+        // Set pairs
         await strategyFactory.setPair(sourceToken.address, targetToken1.address);
         const getPair1Tx = await strategyFactory.getPairId(sourceToken.address, targetToken1.address);
-        const pair1Id  = ethers.BigNumber.from(getPair1Tx).toNumber();
+        const pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
         pairs[targetToken1.address] = pair1Id;
 
-        // Get signers and send source token to signers 2-5
-        [signer1, signer2, signer3, signer4, signer5] = await ethers.getSigners();        
+        await strategyFactory.setPair(sourceToken.address, targetToken2.address);
+        const getPair2Tx = await strategyFactory.getPairId(sourceToken.address, targetToken2.address);
+        const pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
+        pairs[targetToken2.address] = pair2Id;
+
+        // Get signers and send source token to other signers
+        [ signer1, signer2, signer3, signer4, signer5 ] = await ethers.getSigners();        
         const transferAmount1 = ethers.utils.parseUnits("5000", 18);
         await sourceToken.transfer(signer2.address, transferAmount1);
 
@@ -124,7 +139,7 @@ describe("initNewStrategy()", function () {
                                                          interval1,
                                                          purchaseAmount1))
                                                          .to.be
-                                                         .revertedWith("Existing strategy for pair");
+                                                         .revertedWith("Existing strategy");
     });
 
     it("Function should increment purchasesRemaining for sourceBalance deposit amount with remainder over purchase amount divisor", async function () {
@@ -146,24 +161,45 @@ describe("initNewStrategy()", function () {
         const slot = parseInt(purchaseSlot) + interval4;
         await sourceToken.connect(signer4).approve(strategyFactory.address, depositAmount4);
         await expect(strategyFactory.connect(signer4).initiateNewStrategy(sourceToken.address,
-                                                                            targetToken1.address,
-                                                                            depositAmount4,
-                                                                            interval4,
-                                                                            purchaseAmount4))
-                                                                            .to.emit(strategyFactory, "StrategyInitiated")
-                                                                            .withArgs(signer4.address, slot);
+                                                                          targetToken1.address,
+                                                                          depositAmount4,
+                                                                          interval4,
+                                                                          purchaseAmount4))
+                                                                          .to.emit(strategyFactory, "StrategyInitiated")
+                                                                          .withArgs(signer4.address, slot);
     });
 
-    it("Function should revert on arbitrary interval input", async function () {
+    it("Function should revert on attempt to initate new strategy with insufficient funds", async function () {
+        await sourceToken.connect(signer4).approve(strategyFactory.address, depositAmount4);
+        await expect(strategyFactory.connect(signer4).initiateNewStrategy(sourceToken.address,
+                                                                          targetToken2.address,
+                                                                          depositAmount4,
+                                                                          interval4,
+                                                                          purchaseAmount4))
+                                                                          .to.be
+                                                                          .revertedWith("ERC20: transfer amount exceeds balance");
+    });
+
+    it("Function should revert on attempt to initate new strategy with arbitrary interval", async function () {
         await sourceToken.connect(signer5).approve(strategyFactory.address, depositAmount5);
         await expect(strategyFactory.connect(signer5).initiateNewStrategy(sourceToken.address,
-                                                                   targetToken1.address,
-                                                                   depositAmount5,
-                                                                   interval5,
-                                                                   purchaseAmount5))
-                                                                   .to.be
-                                                                   .revertedWith("Unsupported interval");
+                                                                          targetToken1.address,
+                                                                          depositAmount5,
+                                                                          interval5,
+                                                                          purchaseAmount5))
+                                                                          .to.be
+                                                                          .revertedWith("Unsupported interval");
     });
 
+    it("Function should revert on attempt to initate new strategy with non existing pairId", async function () {
+        await sourceToken.connect(signer5).approve(strategyFactory.address, depositAmount5);
+        await expect(strategyFactory.connect(signer5).initiateNewStrategy(sourceToken.address,
+                                                                          targetToken3.address,
+                                                                          depositAmount5,
+                                                                          interval5,
+                                                                          purchaseAmount5))
+                                                                          .to.be
+                                                                          .revertedWith("Pair does not exist");
+    });
 
 });

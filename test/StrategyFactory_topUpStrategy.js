@@ -42,7 +42,7 @@ describe("topUpStrategy()", function () {
     const purchaseAmount4 = ethers.utils.parseUnits(purchase4.toString(), 18);
     const topUpAmount4 = ethers.utils.parseUnits(topUp4.toString(), 18);
 
-    let strategyFactory, sourceToken, targetToken1, targetToken2,
+    let strategyFactory, sourceToken, targetToken1, targetToken2, targetToken3,
         signer1, signer2, signer3, signer4;
 
     before("Deploy testing tokens and StrategyFactory.sol", async function () { 
@@ -60,6 +60,11 @@ describe("topUpStrategy()", function () {
         const TargetToken2 = await ethers.getContractFactory("TargetToken");
         targetToken2 = await TargetToken2.deploy();
         await targetToken2.deployed();
+
+        // Deploy ERC20 target token 3
+        const TargetToken3 = await ethers.getContractFactory("TargetToken");
+        targetToken3 = await TargetToken3.deploy();
+        await targetToken3.deployed();
 
         // Deploy Strategy Factory contract
         const StrategyFactory = await ethers.getContractFactory("StrategyFactory");
@@ -79,8 +84,8 @@ describe("topUpStrategy()", function () {
         pairs[targetToken2.address] = pair2Id;
         reversePairs[pair2Id] = targetToken2.address;
 
-        // Get signers and send source token to signers 2
-        [signer1, signer2, signer3, signer4, signer5] = await ethers.getSigners();
+        // Get signers and send source token to other signers
+        [ signer1, signer2, signer3, signer4 ] = await ethers.getSigners();
         const transferAmount1 = ethers.utils.parseUnits((deposit2 + topUp2).toString(), 18);
         await sourceToken.transfer(signer2.address, transferAmount1);
 
@@ -95,30 +100,30 @@ describe("topUpStrategy()", function () {
         // Signer 1 initiates ETH strategy
         await sourceToken.approve(strategyFactory.address, depositAmount1_ETH);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                           targetToken1.address,
-                                           depositAmount1_ETH,
-                                           interval1_ETH,
-                                           purchaseAmount1_ETH);
+                                                    targetToken1.address,
+                                                    depositAmount1_ETH,
+                                                    interval1_ETH,
+                                                    purchaseAmount1_ETH);
 
         // Signer 1 topsUp ETH strategy
         await sourceToken.approve(strategyFactory.address, topUpAmount1_ETH);
         await strategyFactory.topUpStrategy(sourceToken.address,
-                                     targetToken1.address,
-                                     topUpAmount1_ETH);             
+                                            targetToken1.address,
+                                            topUpAmount1_ETH);             
                                      
         // Signer 2 initiates strategy
         await sourceToken.connect(signer2).approve(strategyFactory.address, depositAmount2);
         await strategyFactory.connect(signer2).initiateNewStrategy(sourceToken.address,
-                                                            targetToken1.address,
-                                                            depositAmount2,
-                                                            interval2,
-                                                            purchaseAmount2);
+                                                                    targetToken1.address,
+                                                                    depositAmount2,
+                                                                    interval2,
+                                                                    purchaseAmount2);
 
         // Signer 2 topsUp strategy
         await sourceToken.connect(signer2).approve(strategyFactory.address, topUpAmount2);
         await strategyFactory.connect(signer2).topUpStrategy(sourceToken.address,
-                                                      targetToken1.address,
-                                                      topUpAmount2);
+                                                            targetToken1.address,
+                                                            topUpAmount2);
 
         const contractBalance = await sourceToken.balanceOf(strategyFactory.address);
         const totalDeposits = (deposit1_ETH + topUp1_ETH + deposit2 + topUp2);
@@ -144,10 +149,10 @@ describe("topUpStrategy()", function () {
         // Signer 1 attemps to top up non-existing strategy for targetToken2
         await sourceToken.connect(signer1).approve(strategyFactory.address, topUp1_ETH);
         await expect(strategyFactory.connect(signer1).topUpStrategy(sourceToken.address,
-                                                             targetToken2.address,
-                                                             topUp1_ETH))
-                                                             .to.be
-                                                             .revertedWith("No existing strategy");
+                                                                    targetToken2.address,
+                                                                    topUp1_ETH))
+                                                                    .to.be
+                                                                    .revertedWith("No existing strategy");
     });
 
     it("Function should increment purchasesRemaining for sourceBalance deposit amount with remainder over purchase amount divisor", async function () {
@@ -175,18 +180,18 @@ describe("topUpStrategy()", function () {
         // Signer 4 initiates strategy in targetToken1
         await sourceToken.connect(signer4).approve(strategyFactory.address, depositAmount4);
         await strategyFactory.connect(signer4).initiateNewStrategy(sourceToken.address,
-                                                            targetToken1.address,
-                                                            depositAmount4,
-                                                            interval4,
-                                                            purchaseAmount4);
+                                                                   targetToken1.address,
+                                                                   depositAmount4,
+                                                                   interval4,
+                                                                   purchaseAmount4);
         
         // Signer 4 topsUp strategy
         await sourceToken.connect(signer4).approve(strategyFactory.address, topUpAmount4);
         await expect(strategyFactory.connect(signer4).topUpStrategy(sourceToken.address,
-                                                             targetToken1.address,
-                                                             topUpAmount4,))
-                                                             .to.emit(strategyFactory, "StrategyToppedUp")
-                                                             .withArgs(signer4.address, topUpAmount4);
+                                                                    targetToken1.address,
+                                                                    topUpAmount4,))
+                                                                    .to.emit(strategyFactory, "StrategyToppedUp")
+                                                                    .withArgs(signer4.address, topUpAmount4);
     });
 
     it("Function should correctly update strategy's source balance and purchases remaining", async function () {
@@ -197,6 +202,26 @@ describe("topUpStrategy()", function () {
 
         assert.equal(sourceBalance, 0);
         assert.equal(expectedPurchasesRemaining, purchasesRemaining);
+    });
+
+    it("Function should revert on attempt to top up strategy with insufficient funds", async function () {
+        await sourceToken.connect(signer4).approve(strategyFactory.address, topUpAmount4);
+        await expect(strategyFactory.connect(signer4).topUpStrategy(sourceToken.address,
+                                                                    targetToken1.address,
+                                                                    topUpAmount4,))
+                                                                    .to.be
+                                                                    .revertedWith("ERC20: transfer amount exceeds balance");
+    });
+
+    it("Function should revert on attempt to top up strategy with non existing pairId", async function () {
+        await sourceToken.connect(signer1).approve(strategyFactory.address, topUpAmount1_ETH);
+        await expect(strategyFactory.connect(signer1).initiateNewStrategy(sourceToken.address,
+                                                                          targetToken3.address,
+                                                                          topUpAmount1_ETH,
+                                                                          interval1_ETH,
+                                                                          purchaseAmount1_ETH))
+                                                                          .to.be
+                                                                          .revertedWith("Pair does not exist");
     });
 
 });
