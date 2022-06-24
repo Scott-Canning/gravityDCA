@@ -105,13 +105,11 @@ contract StrategyFactory is Ownable {
 
     /**
      * @notice Enables new strategy pairing
-     * NOTE: [TESTING] after testing add onlyOwner
-     * note: Requires source and target tokens to be set in mappings first
      * @param _fromToken token that funds _toToken purchase
      * @param _toToken token that gets purchased with _fromToken
      */
     function setPair(address _fromToken, address _toToken) public onlyOwner {
-        require(pairs[_fromToken][_toToken] == 0, "Pair already exists");
+        require(pairs[_fromToken][_toToken] == 0, "Pair exists");
         uint _pairId = reversePairs.length;
         pairs[_fromToken][_toToken] = _pairId;
         reversePairs.push(Pairs(_fromToken, _toToken));
@@ -125,7 +123,7 @@ contract StrategyFactory is Ownable {
     function getPairId(address _fromToken, address _toToken) public view returns (uint) {
         return pairs[_fromToken][_toToken];
     }
-    
+
     /**
      * @notice Pair's addresses getter
      * @param _pairId pairId of the pair's addresses being sought
@@ -137,7 +135,6 @@ contract StrategyFactory is Ownable {
 
     /**
      * @notice Handles removable of existing pair
-     * NOTE: [TESTING] after testing add onlyOwner
      * note:
      * - Should only be executed if no live strategies exist for either pair
      * - Deletes pair from 'pairs' mapping
@@ -182,8 +179,7 @@ contract StrategyFactory is Ownable {
     function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public payable {
         uint _pairId = pairs[_sourceAsset][_targetAsset];
         require(_pairId > 0, "Pair does not exist");
-        require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Account has existing strategy for target asset");
-        require(_sourceBalance > 0, "Insufficient deposit amount");
+        require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy for pair");
         require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
         depositSource(_sourceAsset, _sourceBalance);
 
@@ -242,8 +238,7 @@ contract StrategyFactory is Ownable {
     function topUpStrategy(address _sourceAsset, address _targetAsset, uint _topUpAmount) public payable {
         uint _pairId = pairs[_sourceAsset][_targetAsset];
         require(_pairId > 0, "Pair does not exist");
-        require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "Account does not have existing strategy for target asset");
-        require(_topUpAmount > 0, "Insufficient deposit amount");
+        require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "No existing strategy for pair");
         depositSource(_sourceAsset, _topUpAmount);
         accounts[msg.sender][_pairId].sourceBalance += _topUpAmount;
 
@@ -281,7 +276,7 @@ contract StrategyFactory is Ownable {
 
         uint _topUpPurchasesRemaining = _balance / _purchaseAmount;
         uint _remainder;
-        if((_topUpPurchasesRemaining > 0) && (_balance % _purchaseAmount > 0)) {
+        if((_balance % _purchaseAmount > 0) && (_topUpPurchasesRemaining > 0)) {
             _remainder = _balance - (_topUpPurchasesRemaining * _purchaseAmount);
             _topUpPurchasesRemaining += 1;
         }
@@ -317,7 +312,7 @@ contract StrategyFactory is Ownable {
      * @param _amount Amount of the target asset the user is withdrawing
      */
     function withdrawTarget(uint _pairId, uint _amount) external {
-        require(accounts[msg.sender][_pairId].targetBalance >= _amount, "Withdrawal amount exceeds target asset balance");
+        require(accounts[msg.sender][_pairId].targetBalance >= _amount, "Amount exceeds balance");
         accounts[msg.sender][_pairId].targetBalance -= _amount;
         (bool success) = IERC20(reversePairs[_pairId].toToken).transfer(msg.sender, _amount);
         require(success, "Withdrawal unsuccessful");
@@ -421,8 +416,8 @@ contract StrategyFactory is Ownable {
                 accounts[_user][_pairId].purchasesRemaining -= 1;
                 // Increment user's pro-rata share of the total purchase amount of the target asset
                 accounts[_user][_pairId].targetBalance += purchaseOrders[purchaseSlot][i].amount * 
-                                                              _purchased[_pairId] / 
-                                                              _pairTrades[_pairId];
+                                                          _purchased[_pairId] / 
+                                                          _pairTrades[_pairId];
                 // Update strategy's next slot
                 accounts[_user][_pairId].nextSlot = purchaseSlot + accounts[_user][_pairId].interval;
                 // [MAY NOT BE NECESSARY - DELETE INSTEAD?] set interval to 0 if purchasesRemaining === 0; 

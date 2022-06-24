@@ -111,7 +111,7 @@ describe("withdrawTarget()", function () {
         assert.isTrue(amount > targetBalance);
         await expect(strategyFactory.withdrawTarget(pairs[targetToken1.address], amount))
                                              .to.be
-                                             .revertedWith("Withdrawal amount exceeds target asset balance");
+                                             .revertedWith("Amount exceeds balance");
     });
 
     // Naive local test (send targetToken1 balance to contract for user to withdraw)

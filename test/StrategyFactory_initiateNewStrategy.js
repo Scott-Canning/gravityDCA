@@ -119,12 +119,12 @@ describe("initNewStrategy()", function () {
     it("Function should revert on user attempt to overwrite existing strategy", async function () {
         await sourceToken.approve(strategyFactory.address, depositAmount1);
         await expect(strategyFactory.initiateNewStrategy(sourceToken.address,
-                                                        targetToken1.address,
-                                                        depositAmount1,
-                                                        interval1,
-                                                        purchaseAmount1))
-                                                        .to.be
-                                                        .revertedWith("Account has existing strategy for target asset");
+                                                         targetToken1.address,
+                                                         depositAmount1,
+                                                         interval1,
+                                                         purchaseAmount1))
+                                                         .to.be
+                                                         .revertedWith("Existing strategy for pair");
     });
 
     it("Function should increment purchasesRemaining for sourceBalance deposit amount with remainder over purchase amount divisor", async function () {

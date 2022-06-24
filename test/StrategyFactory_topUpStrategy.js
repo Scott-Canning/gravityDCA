@@ -147,7 +147,7 @@ describe("topUpStrategy()", function () {
                                                              targetToken2.address,
                                                              topUp1_ETH))
                                                              .to.be
-                                                             .revertedWith("Account does not have existing strategy for target asset");
+                                                             .revertedWith("No existing strategy");
     });
 
     it("Function should increment purchasesRemaining for sourceBalance deposit amount with remainder over purchase amount divisor", async function () {
