@@ -86,51 +86,51 @@ contract StrategyFactory is Ownable {
 
     /**
      * @notice 'accounts' nested mapping getter
-     * @param _user Address of user account
-     * @param _pairId Strategy pairId of the source and target assets
+     * @param user Address of user account
+     * @param pairId Strategy pairId of the source and target assets
      * @return Strategy struct mapped from user's address and strategy pairId
      */
-    function getStrategyDetails(address _user, uint _pairId) public view returns (Strategy memory) {
-        return accounts[_user][_pairId];
+    function getStrategyDetails(address user, uint pairId) public view returns (Strategy memory) {
+        return accounts[user][pairId];
     }
 
     /**
      * @notice 'purchaseOrders' mapping getter
-     * @param _slot The purchase slot for which details are being sought
+     * @param slot Purchase slot for which details are being sought
      * @return PurchaseOrder array containing all purchase orders of the passed purchase slot
      */
-    function getPurchaseOrderDetails(uint _slot) public view returns (PurchaseOrder[] memory) {
-        return purchaseOrders[_slot];
+    function getPurchaseOrderDetails(uint slot) public view returns (PurchaseOrder[] memory) {
+        return purchaseOrders[slot];
     }
 
     /**
      * @notice Enables new strategy pairing
-     * @param _fromToken token that funds _toToken purchase
-     * @param _toToken token that gets purchased with _fromToken
+     * @param fromToken Token that funds _toToken purchase
+     * @param toToken Token that gets purchased with _fromToken
      */
-    function setPair(address _fromToken, address _toToken) public onlyOwner {
-        require(pairs[_fromToken][_toToken] == 0, "Pair exists");
+    function setPair(address fromToken, address toToken) public onlyOwner {
+        require(pairs[fromToken][toToken] == 0, "Pair exists");
         uint _pairId = reversePairs.length;
-        pairs[_fromToken][_toToken] = _pairId;
-        reversePairs.push(Pairs(_fromToken, _toToken));
+        pairs[fromToken][toToken] = _pairId;
+        reversePairs.push(Pairs(fromToken, toToken));
     }
 
     /**
      * @notice 'pairId' getter
-     * @param _fromToken Token address that funds _toToken purchase
-     * @param _toToken Token address that gets purchased with _fromToken
+     * @param fromToken Token address that funds _toToken purchase
+     * @param toToken Token address that gets purchased with _fromToken
      */
-    function getPairId(address _fromToken, address _toToken) public view returns (uint) {
-        return pairs[_fromToken][_toToken];
+    function getPairId(address fromToken, address toToken) public view returns (uint) {
+        return pairs[fromToken][toToken];
     }
 
     /**
      * @notice Pair's addresses getter
-     * @param _pairId pairId of the pair's addresses being sought
+     * @param pairId pairId of the pair's addresses being sought
      * @return fromToken and toToken addresses tuple associated with the passed pairId
      */
-    function getPairAddresses(uint _pairId) public view returns (address, address) {
-        return(reversePairs[_pairId].fromToken, reversePairs[_pairId].toToken);
+    function getPairAddresses(uint pairId) public view returns (address, address) {
+        return(reversePairs[pairId].fromToken, reversePairs[pairId].toToken);
     }
 
     /**
@@ -140,13 +140,13 @@ contract StrategyFactory is Ownable {
      * - Deletes pair from 'pairs' mapping
      * - Swaps last pair in 'reversePairs' into index of pair being removed
      * - Points 'pairs' mapping for last pair to new pairId
-     * @param _fromToken source token address of pair being removed
-     * @param _toToken target token address of pair being removed
+     * @param fromToken Source token address of pair being removed
+     * @param toToken Target token address of pair being removed
      */
-    function removePair(address _fromToken, address _toToken) public onlyOwner {
-        require(pairs[_fromToken][_toToken] > 0, "Pair does not exist");
-        uint _pairId = pairs[_fromToken][_toToken];
-        delete pairs[_fromToken][_toToken];
+    function removePair(address fromToken, address toToken) public onlyOwner {
+        require(pairs[fromToken][toToken] > 0, "Pair does not exist");
+        uint _pairId = pairs[fromToken][toToken];
+        delete pairs[fromToken][toToken];
         uint _lastPairIdx = reversePairs.length - 1;
         reversePairs[_pairId] = reversePairs[_lastPairIdx];
         reversePairs.pop();
@@ -156,42 +156,42 @@ contract StrategyFactory is Ownable {
 
     /**
      * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
-     * @param _slot the purchase slot accumulated purchase amounts of target assets are being sought for
+     * @param slot The purchase slot accumulated purchase amounts of target assets are being sought for
      */
-    function accumulatePurchaseOrders(uint _slot) public view returns (uint[] memory) {
+    function accumulatePurchaseOrders(uint slot) public view returns (uint[] memory) {
         uint[] memory _totals = new uint[](reversePairs.length);
-        for(uint i = 0; i < purchaseOrders[_slot].length; i++) {
-            _totals[purchaseOrders[_slot][i].pairId] += purchaseOrders[_slot][i].amount;
+        for(uint i = 0; i < purchaseOrders[slot].length; i++) {
+            _totals[purchaseOrders[slot][i].pairId] += purchaseOrders[slot][i].amount;
         }
         return _totals;
     }
 
     /**
      * @notice Initiates new DCA strategy based on user's configuration
-     * @param _sourceAsset deposited asset the user's strategy will use to fund future purchases
-     * @param _targetAsset asset the user's strategy will be purchasing
-     * @param _sourceBalance deposit amount of the source asset
-     * @param _interval defines daily cadence of target asset purchases
-     * @param _purchaseAmount defines amount to be purchased at each interval
+     * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
+     * @param targetAsset Asset the user's strategy will be purchasing
+     * @param sourceBalance Deposit amount of the source asset
+     * @param interval Defines daily cadence of target asset purchases
+     * @param purchaseAmount Defines amount to be purchased at each interval
      * note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
      * strategy at first interval.
      */
-    function initiateNewStrategy(address _sourceAsset, address _targetAsset, uint _sourceBalance, uint _interval, uint _purchaseAmount) public payable {
-        uint _pairId = pairs[_sourceAsset][_targetAsset];
+    function initiateNewStrategy(address sourceAsset, address targetAsset, uint sourceBalance, uint interval, uint purchaseAmount) public payable {
+        uint _pairId = pairs[sourceAsset][targetAsset];
         require(_pairId > 0, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy");
-        require(_interval == 1 || _interval == 7 || _interval == 14 || _interval == 21 || _interval == 30, "Unsupported interval");
-        depositSource(_sourceAsset, _sourceBalance);
+        require(interval == 1 || interval == 7 || interval == 14 || interval == 21 || interval == 30, "Unsupported interval");
+        depositSource(sourceAsset, sourceBalance);
 
         // Incur fee
-        uint _balance = _sourceBalance;
-        if(fee > 0) _balance = incurFee(_sourceBalance);
+        uint _balance = sourceBalance;
+        if(fee > 0) _balance = incurFee(sourceBalance);
 
         // Calculate purchases remaining and account for remainder purchase amounts
-        uint _purchasesRemaining = _balance / _purchaseAmount;
+        uint _purchasesRemaining = _balance / purchaseAmount;
         uint _remainder;
-        if((_balance % _purchaseAmount) > 0) {
-            _remainder = _balance - (_purchasesRemaining * _purchaseAmount);
+        if((_balance % purchaseAmount) > 0) {
+            _remainder = _balance - (_purchasesRemaining * purchaseAmount);
             _purchasesRemaining += 1;
         }
 
@@ -201,50 +201,50 @@ contract StrategyFactory is Ownable {
             _targetBalance += accounts[msg.sender][_pairId].targetBalance;
         }
 
-        accounts[msg.sender][_pairId] = Strategy(purchaseSlot + _interval,
+        accounts[msg.sender][_pairId] = Strategy(purchaseSlot + interval,
                                                  _balance,
                                                  0,
-                                                 _interval,
-                                                 _purchaseAmount,
+                                                 interval,
+                                                 purchaseAmount,
                                                  _purchasesRemaining
                                                  );
 
         // Populate purchaseOrders mapping
         uint _currentSlot = purchaseSlot;
         for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _purchaseSlot = _currentSlot + (_interval * i);
+            uint _purchaseSlot = _currentSlot + (interval * i);
             if(_purchasesRemaining == i && _remainder > 0) {
                 purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _remainder, _pairId));
             } else {
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _purchaseAmount, _pairId));
+                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, purchaseAmount, _pairId));
             }
         }
         accounts[msg.sender][_pairId].sourceBalance = 0;
-        emit StrategyInitiated(msg.sender, purchaseSlot + _interval);
+        emit StrategyInitiated(msg.sender, purchaseSlot + interval);
     }
 
     /**
      * @notice Tops up uses existing strategy with additional units of the source asset
-     * @param _sourceAsset deposited asset the user's strategy will use to fund future purchases
-     * @param _targetAsset asset the user's strategy will be purchasing
-     * @param _topUpAmount defines amount to be purchased at each interval
+     * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
+     * @param targetAsset Asset the user's strategy will be purchasing
+     * @param topUpAmount Defines amount to be purchased at each interval
      * note:
      * - Population of the purchaseOrders mapping uses 0-based indexing to top up an existing
      *   strategy starting at the _slotOffset
      * - Function first checks for a purchaseAmount shortfall in the last purchase slot of the 
      *   user's existing strategy and if one exists, it fills that purchase slot and updates the 
-     *   _topUpAmount accordingly
+     *   topUpAmount accordingly
      */
-    function topUpStrategy(address _sourceAsset, address _targetAsset, uint _topUpAmount) public payable {
-        uint _pairId = pairs[_sourceAsset][_targetAsset];
+    function topUpStrategy(address sourceAsset, address targetAsset, uint topUpAmount) public payable {
+        uint _pairId = pairs[sourceAsset][targetAsset];
         require(_pairId > 0, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "No existing strategy for pair");
-        depositSource(_sourceAsset, _topUpAmount);
-        accounts[msg.sender][_pairId].sourceBalance += _topUpAmount;
+        depositSource(sourceAsset, topUpAmount);
+        accounts[msg.sender][_pairId].sourceBalance += topUpAmount;
 
         // Incur fee
-        uint _balance = _topUpAmount;
-        if(fee > 0) _balance = incurFee(_topUpAmount);
+        uint _balance = topUpAmount;
+        if(fee > 0) _balance = incurFee(topUpAmount);
 
         // Calculate offset starting point for top up purchases and ending point for existing purchase shortfalls
         Strategy storage strategy = accounts[msg.sender][_pairId];
@@ -297,26 +297,26 @@ contract StrategyFactory is Ownable {
 
     /**
      * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
-     * @param _token [COMPLETE]
-     * @param _amount [COMPLETE]
+     * @param token address of ERC20 token to be deposited into contract
+     * @param amount amount of ERC20 token to be deposited into contract
      */
-    function depositSource(address _token, uint256 _amount) internal {
-        (bool success) = IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+    function depositSource(address token, uint256 amount) internal {
+        (bool success) = IERC20(token).transferFrom(msg.sender, address(this), amount);
         require(success, "Deposit unsuccessful");
-        emit Deposited(block.timestamp, msg.sender, _amount);
+        emit Deposited(block.timestamp, msg.sender, amount);
     }
 
     /**
      * @notice Allows users to withdrawal target asset
-     * @param _pairId pairId of the strategy user is withdrawing the target asset from
-     * @param _amount Amount of the target asset the user is withdrawing
+     * @param pairId pairId of the strategy user is withdrawing the target asset from
+     * @param amount Amount of the target asset the user is withdrawing
      */
-    function withdrawTarget(uint _pairId, uint _amount) external {
-        require(accounts[msg.sender][_pairId].targetBalance >= _amount, "Amount exceeds balance");
-        accounts[msg.sender][_pairId].targetBalance -= _amount;
-        (bool success) = IERC20(reversePairs[_pairId].toToken).transfer(msg.sender, _amount);
+    function withdrawTarget(uint pairId, uint amount) external {
+        require(accounts[msg.sender][pairId].targetBalance >= amount, "Amount exceeds balance");
+        accounts[msg.sender][pairId].targetBalance -= amount;
+        (bool success) = IERC20(reversePairs[pairId].toToken).transfer(msg.sender, amount);
         require(success, "Withdrawal unsuccessful");
-        emit Withdrawal(msg.sender, _amount);
+        emit Withdrawal(msg.sender, amount);
     }
 
     /**
@@ -329,13 +329,13 @@ contract StrategyFactory is Ownable {
 
     /**
      * @notice Incurs fee on balance
-     * @param _balance Balance on which a fee is to be incurred
+     * @param balance Balance on which a fee is to be incurred
      * @return The passed balance less the fee incurred
      */
-    function incurFee(uint _balance) internal returns (uint) {
-        uint _feeIncurred = _balance * fee / 100e18;
+    function incurFee(uint balance) internal returns (uint) {
+        uint _feeIncurred = balance * fee / 100e18;
         treasury += _feeIncurred;
-        return _balance - _feeIncurred;
+        return balance - _feeIncurred;
     }
 
 
@@ -420,7 +420,7 @@ contract StrategyFactory is Ownable {
                                                           _pairTrades[_pairId];
                 // Update strategy's next slot
                 accounts[_user][_pairId].nextSlot = purchaseSlot + accounts[_user][_pairId].interval;
-                // [MAY NOT BE NECESSARY - DELETE INSTEAD?] set interval to 0 if purchasesRemaining === 0; 
+                // Set interval to 0 if purchasesRemaining === 0; 
                 if(accounts[_user][_pairId].purchasesRemaining == 0) {
                     accounts[_user][_pairId].interval = 0;
                 }
