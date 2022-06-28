@@ -7,8 +7,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
-/// @dev [TESTING]
-import "hardhat/console.sol";
 
 /**
  * @notice Implementation of the Gravity Strategy Factory contract. Handles pair account, 
@@ -55,14 +53,14 @@ contract StrategyFactory is Ownable {
     */ 
     mapping (address => uint) public treasury;
 
-    /// @notice Data type used for slotting a user's future purchase orders
+    /// @notice Used for slotting a user's future purchase orders
     struct PurchaseOrder {
         address         user;
         uint            amount;
         uint            pairId;
     }
 
-    /// @notice Data type used for tracking a user's current DCA strategy
+    /// @notice Used for tracking a user's DCA strategy for pair
     struct Strategy {
         uint            nextSlot;
         uint            targetBalance;
@@ -71,11 +69,11 @@ contract StrategyFactory is Ownable {
         uint            purchasesRemaining;
     }
 
+    /// @notice Used for specifying unique asset pairs and routing paths
     struct Pair {
         address         fromToken;
         address         toToken;
         bytes           path;
-        // uint24       minPurchaseAmount; [TESTING]
     }
 
     event StrategyInitiated(address account, uint nextPurchaseSlot);
@@ -362,7 +360,6 @@ contract StrategyFactory is Ownable {
         return balance - _feeIncurred;
     }
 
-
     /**
      * @notice Treasury mapping getter by source asset
      * @return Treasury balance of source asset
@@ -415,26 +412,20 @@ contract StrategyFactory is Ownable {
             uint _pairCount = reversePairs.length;
             uint[] memory _pairTrades = accumulatePurchaseOrders(purchaseSlot);
             uint[] memory _purchased = new uint[](_pairCount);
-            
             for(uint i = 1; i < _pairCount; i++) {
                 uint _total = _pairTrades[i];
                 if(_total > 0) {
-
                     /////////////////////////////////////////////////////
                     ////////////////////// TESTING //////////////////////
                     // [SIMULATED LOCAL SWAP]
                     // _purchased[i] += _total / AssetPrices[i];
-
                     // [FORKED MAINNET SWAP]
                     _purchased[i] = swap(i,
                                          reversePairs[i].fromToken,
                                          _total,
                                          0);
-
-                    //delete _totals[reverseSourceTokens.get(i)][reverseTargetTokens.get(j)];
                     ////////////////////// TESTING //////////////////////
-                    /////////////////////////////////////////////////////
-                    
+                    /////////////////////////////////////////////////////                    
                 }
             }
 
@@ -442,18 +433,15 @@ contract StrategyFactory is Ownable {
             for(uint i = 0; i < purchaseOrders[_purchaseSlot].length; i++) {
                 address _user = purchaseOrders[_purchaseSlot][i].user;
                 uint _pairId = purchaseOrders[_purchaseSlot][i].pairId;
-                // Decrement purchases remaining, increment pro-rata share, update next slot
                 accounts[_user][_pairId].purchasesRemaining -= 1;
                 accounts[_user][_pairId].targetBalance += purchaseOrders[_purchaseSlot][i].amount * 
                                                           _purchased[_pairId] / 
                                                           _pairTrades[_pairId];
                 accounts[_user][_pairId].nextSlot = purchaseSlot + accounts[_user][_pairId].interval;
-                // Set interval to 0 if purchasesRemaining === 0; 
                 if(accounts[_user][_pairId].purchasesRemaining == 0) {
                     accounts[_user][_pairId].interval = 0;
                 }
             }
-            // Delete purchaseOrder post swap to redeem gas
             delete purchaseOrders[_purchaseSlot];
         }
         purchaseSlot++;
