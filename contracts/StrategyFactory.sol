@@ -1,5 +1,6 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -19,7 +20,6 @@ contract StrategyFactory is Ownable {
     uint public lastTimeStamp;
     uint public immutable upKeepInterval;
     uint public fee;
-    uint public treasury;
     
     /// @notice pool fee set to 0.3%
     uint24 public constant poolFee = 3000;                      
@@ -47,7 +47,13 @@ contract StrategyFactory is Ownable {
     * @notice Reverse index array for all pairs
     * Pairs[ pairId ] = Pair( fromToken, toToken )
     */   
-    Pairs[] public reversePairs;
+    Pair[] public reversePairs;
+
+    /**
+    * @notice Treasury mapping for each respective asset 
+    * ( source asset address => accumulated treasury )
+    */ 
+    mapping (address => uint) public treasury;
 
     /// @notice Data type used for slotting a user's future purchase orders
     struct PurchaseOrder {
@@ -59,16 +65,17 @@ contract StrategyFactory is Ownable {
     /// @notice Data type used for tracking a user's current DCA strategy
     struct Strategy {
         uint            nextSlot;
-        uint            sourceBalance;
         uint            targetBalance;
         uint            interval;
         uint            purchaseAmount;
         uint            purchasesRemaining;
     }
 
-    struct Pairs {
+    struct Pair {
         address         fromToken;
         address         toToken;
+        bytes           path;
+        // uint24       minPurchaseAmount; [TESTING]
     }
 
     event StrategyInitiated(address account, uint nextPurchaseSlot);
@@ -76,12 +83,11 @@ contract StrategyFactory is Ownable {
     event Deposited(uint timestamp, address from, uint sourceDeposited);
     event Withdrawal(address account, uint amount);
 
-    /// @notice Set Keepers upkeep interval, last timestamp, 1-base pairId
+    /// @notice Set Keepers upkeep interval, last timestamp, 1-base pairId (avoid default mapping value)
     constructor(uint _upKeepInterval) {
         upKeepInterval = _upKeepInterval;
         lastTimeStamp = block.timestamp;
-        // pairIds are 1-based to avoid default mapping value
-        reversePairs.push(Pairs(address(0), address(0)));
+        reversePairs.push(Pair(address(0), address(0), ""));
     }
 
     /**
@@ -112,7 +118,7 @@ contract StrategyFactory is Ownable {
         require(pairs[fromToken][toToken] == 0, "Pair exists");
         uint _pairId = reversePairs.length;
         pairs[fromToken][toToken] = _pairId;
-        reversePairs.push(Pairs(fromToken, toToken));
+        reversePairs.push(Pair(fromToken, toToken, ""));
     }
 
     /**
@@ -155,6 +161,23 @@ contract StrategyFactory is Ownable {
     }
 
     /**
+     * @notice Sets pool path for V3 swapping [TESTING]
+     * - in production would be only owner
+     */
+    function setPath(uint24 pairId, uint24 params,
+                     address assetA, uint24 fee1, 
+                     address assetB, uint24 fee2, 
+                     address assetC, uint24 fee3, 
+                     address assetD)
+                     public {
+        if(params == 5) {
+            reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB, fee2, assetC);
+        } else if (params == 7) {
+            reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB, fee2, assetC, fee3, assetD);
+        }
+    }
+
+    /**
      * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
      * @param slot The purchase slot accumulated purchase amounts of target assets are being sought for
      */
@@ -167,7 +190,7 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice Initiates new DCA strategy based on user's configuration
+     * @notice Initiates new dollar cost strategy based on user's configuration
      * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
      * @param targetAsset Asset the user's strategy will be purchasing
      * @param sourceBalance Deposit amount of the source asset
@@ -176,7 +199,7 @@ contract StrategyFactory is Ownable {
      * note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
      * strategy at first interval.
      */
-    function initiateNewStrategy(address sourceAsset, address targetAsset, uint sourceBalance, uint interval, uint purchaseAmount) public payable {
+    function initiateNewStrategy(address sourceAsset, address targetAsset, uint sourceBalance, uint interval, uint purchaseAmount) public {
         uint _pairId = pairs[sourceAsset][targetAsset];
         require(_pairId > 0, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy");
@@ -185,7 +208,9 @@ contract StrategyFactory is Ownable {
 
         // Incur fee
         uint _balance = sourceBalance;
-        if(fee > 0) _balance = incurFee(sourceBalance);
+        if(fee > 0) {
+            _balance = incurFee(sourceAsset, sourceBalance);
+        }
 
         // Calculate purchases remaining and account for remainder purchase amounts
         uint _purchasesRemaining = _balance / purchaseAmount;
@@ -202,7 +227,7 @@ contract StrategyFactory is Ownable {
         }
 
         accounts[msg.sender][_pairId] = Strategy(purchaseSlot + interval,
-                                                 _balance,
+                                                 //_balance,
                                                  0,
                                                  interval,
                                                  purchaseAmount,
@@ -219,12 +244,11 @@ contract StrategyFactory is Ownable {
                 purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, purchaseAmount, _pairId));
             }
         }
-        accounts[msg.sender][_pairId].sourceBalance = 0;
         emit StrategyInitiated(msg.sender, purchaseSlot + interval);
     }
 
     /**
-     * @notice Tops up uses existing strategy with additional units of the source asset
+     * @notice Tops up users existing strategy with additional units of the source asset
      * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
      * @param targetAsset Asset the user's strategy will be purchasing
      * @param topUpAmount Defines amount to be purchased at each interval
@@ -240,11 +264,12 @@ contract StrategyFactory is Ownable {
         require(_pairId > 0, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "No existing strategy for pair");
         depositSource(sourceAsset, topUpAmount);
-        accounts[msg.sender][_pairId].sourceBalance += topUpAmount;
-
+        
         // Incur fee
         uint _balance = topUpAmount;
-        if(fee > 0) _balance = incurFee(topUpAmount);
+        if(fee > 0) {
+            _balance = incurFee(sourceAsset, topUpAmount);
+        }
 
         // Calculate offset starting point for top up purchases and ending point for existing purchase shortfalls
         Strategy storage strategy = accounts[msg.sender][_pairId];
@@ -290,7 +315,6 @@ contract StrategyFactory is Ownable {
                 purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _purchaseAmount, _pairId));
             }
         }
-        strategy.sourceBalance = 0;
         strategy.purchasesRemaining += _topUpPurchasesRemaining;
         emit StrategyToppedUp(msg.sender, _balance);
     }
@@ -332,40 +356,46 @@ contract StrategyFactory is Ownable {
      * @param balance Balance on which a fee is to be incurred
      * @return The passed balance less the fee incurred
      */
-    function incurFee(uint balance) internal returns (uint) {
+    function incurFee(address sourceAsset, uint balance) internal returns (uint) {
         uint _feeIncurred = balance * fee / 100e18;
-        treasury += _feeIncurred;
+        treasury[sourceAsset] += _feeIncurred;
         return balance - _feeIncurred;
     }
 
+
+    /**
+     * @notice Treasury mapping getter by source asset
+     * @return Treasury balance of source asset
+     */
+    function getTreasury(address sourceAsset) public view returns (uint) {
+        return treasury[sourceAsset];
+    }
 
     /////////////////////////////////////////////////////
     ////////////////////// TESTING //////////////////////
     ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
 
-    function swap(address _tokenIn, address _tokenOut, uint256 _amountIn, uint256 _amountOutMin) internal returns (uint256 amountOut) {
+    /**
+     * NOTE: [TESTING visibility needs to be changed to INTERNAL post
+     */
+    function swap(uint pairId, address tokenIn, uint256 amountIn, uint256 amountOutMin) public returns (uint256 amountOut) {
         // approve router to spend tokenIn
-        TransferHelper.safeApprove(_tokenIn, address(swapRouter), _amountIn);
+        TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
 
         // naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum
         // set sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-        ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: _tokenIn,
-                tokenOut: _tokenOut,
-                fee: poolFee,
+        ISwapRouter.ExactInputParams memory params =
+            ISwapRouter.ExactInputParams({
+                path: reversePairs[pairId].path,
                 recipient: address(this),
                 deadline: block.timestamp,
-                amountIn: _amountIn,
-                amountOutMinimum: _amountOutMin,
-                sqrtPriceLimitX96: 0
+                amountIn: amountIn,
+                amountOutMinimum: amountOutMin
             });
-
-        // execute the swap
-        amountOut = swapRouter.exactInputSingle(params);
+        amountOut = swapRouter.exactInput(params);
     }
 
-    /// @notice [TESTING] placeholder oracle prices for test swapping
+    /// @notice [TESTING] placeholder oracle prices for local swap testing
     uint[] public AssetPrices = [0, 2000, 30000, 1]; // null, ETH, BTC, MATIC
 
 
@@ -393,13 +423,13 @@ contract StrategyFactory is Ownable {
                     /////////////////////////////////////////////////////
                     ////////////////////// TESTING //////////////////////
                     // [SIMULATED LOCAL SWAP]
-                    _purchased[i] += _total / AssetPrices[i];
+                    // _purchased[i] += _total / AssetPrices[i];
 
                     // [FORKED MAINNET SWAP]
-                    // _purchased[i][j] = swap(reversePairs[i].fromToken, 
-                    //                         reversePairs[i].toToken,
-                    //                         _total,
-                    //                         0);
+                    _purchased[i] = swap(i,
+                                         reversePairs[i].fromToken,
+                                         _total,
+                                         0);
 
                     //delete _totals[reverseSourceTokens.get(i)][reverseTargetTokens.get(j)];
                     ////////////////////// TESTING //////////////////////
@@ -408,17 +438,15 @@ contract StrategyFactory is Ownable {
                 }
             }
 
-            // Handle accounting for purchased asset for each user
-            for(uint i = 0; i < purchaseOrders[purchaseSlot].length; i++) {
-                address _user = purchaseOrders[purchaseSlot][i].user;
-                uint _pairId = purchaseOrders[purchaseSlot][i].pairId;
-                // Decrement purchases remaining
+            uint _purchaseSlot = purchaseSlot;
+            for(uint i = 0; i < purchaseOrders[_purchaseSlot].length; i++) {
+                address _user = purchaseOrders[_purchaseSlot][i].user;
+                uint _pairId = purchaseOrders[_purchaseSlot][i].pairId;
+                // Decrement purchases remaining, increment pro-rata share, update next slot
                 accounts[_user][_pairId].purchasesRemaining -= 1;
-                // Increment user's pro-rata share of the total purchase amount of the target asset
-                accounts[_user][_pairId].targetBalance += purchaseOrders[purchaseSlot][i].amount * 
+                accounts[_user][_pairId].targetBalance += purchaseOrders[_purchaseSlot][i].amount * 
                                                           _purchased[_pairId] / 
                                                           _pairTrades[_pairId];
-                // Update strategy's next slot
                 accounts[_user][_pairId].nextSlot = purchaseSlot + accounts[_user][_pairId].interval;
                 // Set interval to 0 if purchasesRemaining === 0; 
                 if(accounts[_user][_pairId].purchasesRemaining == 0) {
@@ -426,7 +454,7 @@ contract StrategyFactory is Ownable {
                 }
             }
             // Delete purchaseOrder post swap to redeem gas
-            delete purchaseOrders[purchaseSlot];
+            delete purchaseOrders[_purchaseSlot];
         }
         purchaseSlot++;
     }
@@ -434,6 +462,8 @@ contract StrategyFactory is Ownable {
     ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
     ////////////////////// TESTING //////////////////////
     /////////////////////////////////////////////////////
+
+    receive() payable external {}
 
     /**
     * Built in the depths of the bear market of 2022. Keep building friends.

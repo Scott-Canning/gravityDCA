@@ -171,7 +171,7 @@ describe("setFee() and incurFee()", function () {
                                                   interval1,
                                                   purchaseAmount1);
 
-        const treasuryBalance = parseFloat(ethers.utils.formatUnits(await strategyFactory.treasury(), 18));
+        const treasuryBalance = parseFloat(ethers.utils.formatUnits(await strategyFactory.getTreasury(sourceToken.address), 18));
         const feeValue = parseFloat(ethers.utils.formatUnits(await strategyFactory.fee(), 18));
         assert.equal(treasuryBalance, (feeValue * deposit1 / 100));
 
@@ -189,12 +189,12 @@ describe("setFee() and incurFee()", function () {
 
     it("Incurring a fee for topping up an existing strategy should increase the treasury's balance and decrease the strategy's scheduled balance by the same amount", async function () {        
         // Signer 1 tops up existing strategy
-        const treasuryBalanceBefore = parseFloat(ethers.utils.formatUnits(await strategyFactory.treasury(), 18));
+        const treasuryBalanceBefore = parseFloat(ethers.utils.formatUnits(await strategyFactory.getTreasury(sourceToken.address), 18));
         await sourceToken.approve(strategyFactory.address, topUpAmount1);
         await strategyFactory.topUpStrategy(sourceToken.address,
                                             targetToken1.address,
                                             topUpAmount1);
-        const treasuryBalanceAfter = parseFloat(ethers.utils.formatUnits(await strategyFactory.treasury(), 18));
+        const treasuryBalanceAfter = parseFloat(ethers.utils.formatUnits(await strategyFactory.getTreasury(sourceToken.address), 18));
         const feeValue = parseFloat(ethers.utils.formatUnits(await strategyFactory.fee(), 18));
         assert.equal((treasuryBalanceAfter - treasuryBalanceBefore), (feeValue * topUp1 / 100));
                 

@@ -194,13 +194,10 @@ describe("topUpStrategy()", function () {
                                                                     .withArgs(signer4.address, topUpAmount4);
     });
 
-    it("Function should correctly update strategy's source balance and purchases remaining", async function () {
+    it("Function should correctly update strategy's purchases remaining", async function () {
         const strategy = await strategyFactory.getStrategyDetails(signer4.address, pairs[targetToken1.address]);
-        const sourceBalance = ethers.BigNumber.from(strategy.sourceBalance).toNumber()
         const purchasesRemaining = ethers.BigNumber.from(strategy.purchasesRemaining).toNumber()
-        const expectedPurchasesRemaining = Math.round((deposit4 + topUp4) / purchase4);
-
-        assert.equal(sourceBalance, 0);
+        const expectedPurchasesRemaining = Math.round((deposit4 + topUp4) / purchase4);;
         assert.equal(expectedPurchasesRemaining, purchasesRemaining);
     });
 
