@@ -14,12 +14,16 @@ import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
  * strategy initiation, strategy topping up, keeper automation, swapping, and target
  * withdrawal.
  */
-contract StrategyFactory is Ownable {    
+contract StrategyFactory is Ownable {
+    /// [TESTING]
+    bool public localTesting = true;
+    /// [TESTING]
     uint public purchaseSlot;
     uint public lastTimeStamp;
     uint public immutable upKeepInterval;
     uint public fee;
     uint public maxDiscount = 99;
+    uint public minPurchaseAmount = 100e18;
     
     /// @notice pool fee set to 0.3%
     uint24 public constant poolFee = 3000;                      
@@ -36,7 +40,7 @@ contract StrategyFactory is Ownable {
     
     /**
     * @notice Mapping for each purchase slot's purchase order array
-    * ( day's purchase slot => purchase order array )
+    * ( day's purchase slot => array of purchase orders )
     */     
     mapping (uint => PurchaseOrder[]) public purchaseOrders;
 
@@ -215,6 +219,14 @@ contract StrategyFactory is Ownable {
         require(interval == 1 || interval == 7 || interval == 14 || interval == 21 || interval == 30, "Unsupported interval");
         depositSource(sourceAsset, sourceBalance);
 
+        // [TESTING]
+        if(!localTesting) {
+            int sourceUSD = getLatestPrice(sourceAsset);
+            uint purchaseAmountUSD = uint(sourceUSD) * purchaseAmount / 1e8;
+            require(purchaseAmountUSD >= minPurchaseAmount, "Purchase amount below minimum");
+        }
+
+
         // Incur fee
         uint _balance = sourceBalance;
         if(fee > 0) {
@@ -273,7 +285,16 @@ contract StrategyFactory is Ownable {
         require(_pairId > 0, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "No existing strategy for pair");
         depositSource(sourceAsset, topUpAmount);
-        
+
+        Strategy storage strategy = accounts[msg.sender][_pairId];
+        uint _purchaseAmount = strategy.purchaseAmount;
+        // [TESTING]
+        if(!localTesting) {
+            int sourceUSD = getLatestPrice(sourceAsset);
+            uint purchaseAmountUSD = uint(sourceUSD) * _purchaseAmount / 1e8;
+            require(purchaseAmountUSD >= minPurchaseAmount, "Purchase amount below minimum");
+        }
+
         // Incur fee
         uint _balance = topUpAmount;
         if(fee > 0) {
@@ -281,8 +302,6 @@ contract StrategyFactory is Ownable {
         }
 
         // Calculate offset starting point for top up purchases and ending point for existing purchase shortfalls
-        Strategy storage strategy = accounts[msg.sender][_pairId];
-        uint _purchaseAmount = strategy.purchaseAmount;
         uint _slotOffset = strategy.nextSlot + (strategy.purchasesRemaining * strategy.interval);
         uint _strategyLastSlot = _slotOffset - strategy.interval;
 
@@ -389,6 +408,14 @@ contract StrategyFactory is Ownable {
     }
 
     /**
+     * @notice Min purchase amount setter
+     * @param _minPurchaseAmount New min purchase amount value
+     */
+    function setMinPurchaseAmount(uint _minPurchaseAmount) external onlyOwner {
+         minPurchaseAmount = _minPurchaseAmount;
+    }
+
+    /**
      * @notice Treasury mapping getter by source asset
      * @return Treasury balance of source asset
      */
@@ -462,13 +489,18 @@ contract StrategyFactory is Ownable {
                 if(_total > 0) {
                     /////////////////////////////////////////////////////
                     ////////////////////// TESTING //////////////////////
-                    // [SIMULATED LOCAL SWAP]
-                    //_purchased[i] += _total / AssetPrices[i];
-                    // [FORKED MAINNET SWAP]
-                    _purchased[i] = swap(i,
-                                         reversePairs[i].fromToken,
-                                         reversePairs[i].toToken,
-                                         _total);
+
+                    if(localTesting) {
+                        // [SIMULATED LOCAL SWAP]
+                        _purchased[i] += _total / AssetPrices[i];
+                    } else {
+                        // [FORKED MAINNET SWAP]
+                        _purchased[i] = swap(i,
+                                            reversePairs[i].fromToken,
+                                            reversePairs[i].toToken,
+                                            _total);
+                    }
+
                     ////////////////////// TESTING //////////////////////
                     /////////////////////////////////////////////////////                    
                 }
