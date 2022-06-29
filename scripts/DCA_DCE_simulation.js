@@ -42,7 +42,6 @@ class User {
     }
 }
 
-
 async function main() {
     async function fastForwardChain(strategy) {
         console.log("------------------------------------------------------------");
@@ -152,6 +151,18 @@ async function main() {
 
 
     ////////////////////////////////////////////////////////////////////////////////
+    // Set price feeds
+    await strategyFactory.setPriceFeed('0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063', '0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D'); // DAI
+    await strategyFactory.setPriceFeed('0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619', '0xF9680D99D6C9589e2a93a78A04A279e509205945'); // WETH
+    await strategyFactory.setPriceFeed('0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6', '0xc907E116054Ad103354f2D350FD2514433D57F6f'); // WBTC
+    await strategyFactory.setPriceFeed('0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', '0xAB594600376Ec9fD91F8e885dADF0CE036862dE0'); // WMATIC
+    //
+    //
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+    
+    ////////////////////////////////////////////////////////////////////////////////
     // Configure pairs and paths
     const pair1Id = await configurePair('DAI', 'WETH');
     await strategyFactory.setPath(pair1Id, 
@@ -202,8 +213,7 @@ async function main() {
                                                                     reversePairs[user1.strategies[0].targetAsset],
                                                                     user1.strategies[0].parsedDeposit,
                                                                     user1.strategies[0].interval,
-                                                                    user1.strategies[0].parsedPurchaseAmount
-    );
+                                                                    user1.strategies[0].parsedPurchaseAmount);
     await printFactoryBalances(daiToken, user1.strategies[0].sourceAsset);
     await fastForwardChain(user1.strategies[0], upKeepInterval);
     await printStrategyResults(user1.signer.address, user1.strategies[0].pairId);
@@ -232,8 +242,7 @@ async function main() {
                                                                     reversePairs[user1.strategies[1].targetAsset],
                                                                     user1.strategies[1].parsedDeposit,
                                                                     user1.strategies[1].interval,
-                                                                    user1.strategies[1].parsedPurchaseAmount,
-                                                                    {gasLimit: 1650000});
+                                                                    user1.strategies[1].parsedPurchaseAmount);
     await printFactoryBalances(wETHtoken, user1.strategies[1].sourceAsset);
     await fastForwardChain(user1.strategies[1], upKeepInterval);
     await printStrategyResults(user1.signer.address, user1.strategies[1].pairId);

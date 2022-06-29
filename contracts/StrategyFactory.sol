@@ -5,6 +5,7 @@ pragma abicoder v2;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
@@ -18,10 +19,14 @@ contract StrategyFactory is Ownable {
     uint public lastTimeStamp;
     uint public immutable upKeepInterval;
     uint public fee;
+    uint public maxDiscount = 99;
     
     /// @notice pool fee set to 0.3%
     uint24 public constant poolFee = 3000;                      
     ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+
+    /// @notice oracle pricefeed
+    AggregatorV3Interface internal priceFeed;
 
     /**
     * @notice Mapping of each user's live strategy for each respective asset 
@@ -52,6 +57,12 @@ contract StrategyFactory is Ownable {
     * ( source asset address => accumulated treasury )
     */ 
     mapping (address => uint) public treasury;
+
+    /**
+    * @notice Oracle price fee mapping for each asset 
+    * (ERC20 token address => oracle price feed address)
+    */ 
+    mapping (address => address) public priceFeeds;
 
     /// @notice Used for slotting a user's future purchase orders
     struct PurchaseOrder {
@@ -112,7 +123,7 @@ contract StrategyFactory is Ownable {
      * @param fromToken Token that funds _toToken purchase
      * @param toToken Token that gets purchased with _fromToken
      */
-    function setPair(address fromToken, address toToken) public onlyOwner {
+    function setPair(address fromToken, address toToken) external onlyOwner {
         require(pairs[fromToken][toToken] == 0, "Pair exists");
         uint _pairId = reversePairs.length;
         pairs[fromToken][toToken] = _pairId;
@@ -147,7 +158,7 @@ contract StrategyFactory is Ownable {
      * @param fromToken Source token address of pair being removed
      * @param toToken Target token address of pair being removed
      */
-    function removePair(address fromToken, address toToken) public onlyOwner {
+    function removePair(address fromToken, address toToken) external onlyOwner {
         require(pairs[fromToken][toToken] > 0, "Pair does not exist");
         uint _pairId = pairs[fromToken][toToken];
         delete pairs[fromToken][toToken];
@@ -345,7 +356,7 @@ contract StrategyFactory is Ownable {
      * @notice Allows owner to set protocol fee
      * @param _fee Fee value in decimal representation of percent, 0.XX * 10e18
      */
-    function setFee(uint _fee) public onlyOwner {
+    function setFee(uint _fee) external onlyOwner {
         fee = _fee;
     }
 
@@ -358,6 +369,23 @@ contract StrategyFactory is Ownable {
         uint _feeIncurred = balance * fee / 100e18;
         treasury[sourceAsset] += _feeIncurred;
         return balance - _feeIncurred;
+    }
+
+    /**
+     * @notice Allows owner to set price feed addresses for each token
+     * @param token Address of token price feed is being set for
+     * @param feed Address of price feed for token
+     */
+    function setPriceFeed(address token, address feed) external onlyOwner {
+        priceFeeds[token] = feed;
+    }
+
+    /**
+     * @notice Max discount setter
+     * @param _maxDiscount New max discount value
+     */
+    function setMaxDiscount(uint _maxDiscount) external onlyOwner {
+         maxDiscount = _maxDiscount;
     }
 
     /**
@@ -375,12 +403,15 @@ contract StrategyFactory is Ownable {
     /**
      * NOTE: [TESTING visibility needs to be changed to INTERNAL post
      */
-    function swap(uint pairId, address tokenIn, uint256 amountIn, uint256 amountOutMin) public returns (uint256 amountOut) {
+    function swap(uint pairId, address tokenIn, address tokenOut, uint256 amountIn) public returns (uint256 amountOut) {
         // approve router to spend tokenIn
         TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
 
-        // naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum
-        // set sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
+        // [LEFT OFF]
+        (int _tokenInPrice, uint8 _inDecimals) = getLatestPrice(tokenIn);
+        (int _tokenOutPrice, uint8 _outDecimals) = getLatestPrice(tokenOut);
+        uint amountOutMin = ((amountIn * uint(_tokenInPrice)) / uint(_tokenOutPrice) * maxDiscount) / 100;
+
         ISwapRouter.ExactInputParams memory params =
             ISwapRouter.ExactInputParams({
                 path: reversePairs[pairId].path,
@@ -390,6 +421,24 @@ contract StrategyFactory is Ownable {
                 amountOutMinimum: amountOutMin
             });
         amountOut = swapRouter.exactInput(params);
+    }
+
+    /**
+     * @notice Chainlink oracle price feed
+     * @return the latest price and decimal for the passed token address
+     */
+    function getLatestPrice(address token) public view returns (int, uint8) {
+        address _token = priceFeeds[token];
+        (
+            uint80 roundID, 
+            int price,
+            uint startedAt,
+            uint timeStamp,
+            uint80 answeredInRound
+        ) = AggregatorV3Interface(_token).latestRoundData();
+        uint8 decimals = AggregatorV3Interface(_token).decimals();
+        require(timeStamp > 0, "Round not complete");
+        return (price, decimals);
     }
 
     /// @notice [TESTING] placeholder oracle prices for local swap testing
@@ -418,12 +467,12 @@ contract StrategyFactory is Ownable {
                     /////////////////////////////////////////////////////
                     ////////////////////// TESTING //////////////////////
                     // [SIMULATED LOCAL SWAP]
-                    // _purchased[i] += _total / AssetPrices[i];
+                    //_purchased[i] += _total / AssetPrices[i];
                     // [FORKED MAINNET SWAP]
                     _purchased[i] = swap(i,
                                          reversePairs[i].fromToken,
-                                         _total,
-                                         0);
+                                         reversePairs[i].toToken,
+                                         _total);
                     ////////////////////// TESTING //////////////////////
                     /////////////////////////////////////////////////////                    
                 }
