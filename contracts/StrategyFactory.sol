@@ -404,12 +404,9 @@ contract StrategyFactory is Ownable {
      * NOTE: [TESTING visibility needs to be changed to INTERNAL post
      */
     function swap(uint pairId, address tokenIn, address tokenOut, uint256 amountIn) public returns (uint256 amountOut) {
-        // approve router to spend tokenIn
         TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
-
-        // [LEFT OFF]
-        (int _tokenInPrice, uint8 _inDecimals) = getLatestPrice(tokenIn);
-        (int _tokenOutPrice, uint8 _outDecimals) = getLatestPrice(tokenOut);
+        int _tokenInPrice = getLatestPrice(tokenIn);
+        int _tokenOutPrice = getLatestPrice(tokenOut);
         uint amountOutMin = ((amountIn * uint(_tokenInPrice)) / uint(_tokenOutPrice) * maxDiscount) / 100;
 
         ISwapRouter.ExactInputParams memory params =
@@ -427,7 +424,7 @@ contract StrategyFactory is Ownable {
      * @notice Chainlink oracle price feed
      * @return the latest price and decimal for the passed token address
      */
-    function getLatestPrice(address token) public view returns (int, uint8) {
+    function getLatestPrice(address token) public view returns (int) {
         address _token = priceFeeds[token];
         (
             uint80 roundID, 
@@ -436,9 +433,8 @@ contract StrategyFactory is Ownable {
             uint timeStamp,
             uint80 answeredInRound
         ) = AggregatorV3Interface(_token).latestRoundData();
-        uint8 decimals = AggregatorV3Interface(_token).decimals();
         require(timeStamp > 0, "Round not complete");
-        return (price, decimals);
+        return price;
     }
 
     /// @notice [TESTING] placeholder oracle prices for local swap testing
