@@ -41,7 +41,7 @@ describe("initNewStrategy()", function () {
     const purchaseAmount5 = ethers.utils.parseUnits(purchase5.toString(), 18);
 
     let strategyFactory, sourceToken, targetToken1, targetToken2, targetToken3,
-        signer1, signer2, signer3, signer4, signer5;
+        signer1, signer2, signer3, signer4, signer5, pair1Id, pair2Id;
     
     before("Deploy testing tokens and StrategyFactory.sol", async function () { 
         // Deploy ERC20 source token
@@ -72,12 +72,12 @@ describe("initNewStrategy()", function () {
         // Set pairs
         await strategyFactory.setPair(sourceToken.address, targetToken1.address);
         const getPair1Tx = await strategyFactory.getPairId(sourceToken.address, targetToken1.address);
-        const pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
+        pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
         pairs[targetToken1.address] = pair1Id;
 
         await strategyFactory.setPair(sourceToken.address, targetToken2.address);
         const getPair2Tx = await strategyFactory.getPairId(sourceToken.address, targetToken2.address);
-        const pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
+        pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
         pairs[targetToken2.address] = pair2Id;
 
         // Get signers and send source token to other signers
@@ -99,18 +99,18 @@ describe("initNewStrategy()", function () {
         // Signer 1 initiates strategy
         await sourceToken.approve(strategyFactory.address, depositAmount1);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                            targetToken1.address,
-                                            depositAmount1,
-                                            interval1,
-                                            purchaseAmount1);
+                                                  targetToken1.address,
+                                                  depositAmount1,
+                                                  interval1,
+                                                  purchaseAmount1);
 
         // Signer 2 initiates strategy
         await sourceToken.connect(signer2).approve(strategyFactory.address, depositAmount2);
         await strategyFactory.connect(signer2).initiateNewStrategy(sourceToken.address,
-                                                            targetToken1.address,
-                                                            depositAmount2,
-                                                            interval2,
-                                                            purchaseAmount2);
+                                                                   targetToken1.address,
+                                                                   depositAmount2,
+                                                                   interval2,
+                                                                   purchaseAmount2);
 
         const contractBalance = await sourceToken.balanceOf(strategyFactory.address);
         const totalDeposits = (deposit1 + deposit2);
@@ -119,7 +119,7 @@ describe("initNewStrategy()", function () {
 
     it("Function should correctly populate purchase orders after user initiates strategy", async function () {
         for(let i = 1; i <= (deposit1 / purchase1); i++) {
-            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
+            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i, pair1Id);
             for(let j = 0; j < purchaseOrders.length; j++) {
                 if(purchaseOrders[j].user === signer1.address) {
                     let pairId = ethers.BigNumber.from(purchaseOrders[j].pairId).toNumber();
@@ -145,10 +145,10 @@ describe("initNewStrategy()", function () {
     it("Function should increment purchasesRemaining for sourceBalance deposit amount with remainder over purchase amount divisor", async function () {
         await sourceToken.connect(signer3).approve(strategyFactory.address, depositAmount3);
         await strategyFactory.connect(signer3).initiateNewStrategy(sourceToken.address,
-                                                                    targetToken1.address,
-                                                                    depositAmount3,
-                                                                    interval3,
-                                                                    purchaseAmount3);
+                                                                   targetToken1.address,
+                                                                   depositAmount3,
+                                                                   interval3,
+                                                                   purchaseAmount3);
 
         const expectedPurchasesRemaining = Math.round(depositAmount3 / purchaseAmount3)
         const strategy = await strategyFactory.getStrategyDetails(signer3.address, pairs[targetToken1.address]);

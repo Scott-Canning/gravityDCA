@@ -24,7 +24,7 @@ describe("setFee() and incurFee()", function () {
     const minDelay = blocktime * timelockBlocks;
 
     let sourceToken, targetToken1, strategyFactory, gravToken, 
-        timelock, governor, signer1, votingDelay, votingPeriod,
+        timelock, governor, signer1, pair1Id, votingDelay, votingPeriod,
         blockNum, block, timestamp;
 
     let propState = [
@@ -78,6 +78,8 @@ describe("setFee() and incurFee()", function () {
 
         // Set pair
         await strategyFactory.setPair(sourceToken.address, targetToken1.address);
+        const getPair1Tx = await strategyFactory.getPairId(sourceToken.address, targetToken1.address);
+        pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
 
         // Get voting configuration from governor contract
         votingDelay = ethers.BigNumber.from(await governor.votingDelay()).toNumber();
@@ -177,7 +179,7 @@ describe("setFee() and incurFee()", function () {
 
         let scheduledBalance = 0;
         for(let i = 1; i <= (deposit1 / purchase1); i++) {
-            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
+            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i, pair1Id);
             for(let j = 0; j < purchaseOrders.length; j++) {
                 if(purchaseOrders[j].user === signer1.address) {
                     scheduledBalance += parseFloat(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));
@@ -194,13 +196,14 @@ describe("setFee() and incurFee()", function () {
         await strategyFactory.topUpStrategy(sourceToken.address,
                                             targetToken1.address,
                                             topUpAmount1);
+
         const treasuryBalanceAfter = parseFloat(ethers.utils.formatUnits(await strategyFactory.getTreasury(sourceToken.address), 18));
         const feeValue = parseFloat(ethers.utils.formatUnits(await strategyFactory.fee(), 18));
         assert.equal((treasuryBalanceAfter - treasuryBalanceBefore), (feeValue * topUp1 / 100));
                 
         let scheduledBalance = 0;
         for(let i = 1; i <= Math.round((deposit1 +  topUp1) / purchase1); i++) {
-            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
+            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i, pair1Id);
             for(let j = 0; j < purchaseOrders.length; j++) {
                 if(purchaseOrders[j].user === signer1.address) {
                     scheduledBalance += parseFloat(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));

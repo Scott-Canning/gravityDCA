@@ -19,7 +19,8 @@ describe("withdrawTarget()", function () {
     const depositAmount1_BTC = ethers.utils.parseUnits(deposit1_BTC.toString(), 18);
     const purchaseAmount1_BTC = ethers.utils.parseUnits(purchase1_BTC.toString(), 18);
 
-    let strategyFactory, sourceToken, targetToken1, targetToken2, targetToken3, signer1;
+    let strategyFactory, sourceToken, targetToken1, targetToken2, targetToken3, signer1,
+        signer2;
 
     let AssetPrices = [0, 2000, 30000, 1]; // null, ETH, BTC, MATIC
 
@@ -63,23 +64,23 @@ describe("withdrawTarget()", function () {
         reversePairs[pair2Id] = targetToken2.address;
 
         // Get signer
-        [ signer1 ] = await ethers.getSigners();
+        [ signer1, signer2 ] = await ethers.getSigners();
 
         // Signer 1 initiates ETH strategy
         await sourceToken.approve(strategyFactory.address, depositAmount1_ETH);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                           targetToken1.address,
-                                           depositAmount1_ETH,
-                                           interval1_ETH,
-                                           purchaseAmount1_ETH);
+                                                  targetToken1.address,
+                                                  depositAmount1_ETH,
+                                                  interval1_ETH,
+                                                  purchaseAmount1_ETH);
 
         // Signer 1 initiates BTC strategy
         await sourceToken.approve(strategyFactory.address, depositAmount1_BTC);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                           targetToken2.address,
-                                           depositAmount1_BTC,
-                                           interval1_BTC,
-                                           purchaseAmount1_BTC);
+                                                  targetToken2.address,
+                                                  depositAmount1_BTC,
+                                                  interval1_BTC,
+                                                  purchaseAmount1_BTC);
 
         // Send withdrawable target tokens to contract
         const transferAmount1 = ethers.utils.parseUnits((deposit1_ETH / AssetPrices[1]).toString(), 18);
@@ -92,14 +93,15 @@ describe("withdrawTarget()", function () {
         let block = await ethers.provider.getBlock(blockNum);
         let timestamp = block.timestamp;
 
-        let endTimestamp = timestamp + (((deposit1_ETH / purchase1_ETH) * interval1_ETH + 2) * upKeepInterval);
+        let endTimestamp = timestamp + (((deposit1_ETH / purchase1_ETH + 10) * interval1_ETH) * upKeepInterval);
         while(timestamp <= endTimestamp) {
-            await strategyFactory.checkUpkeepTEST({gasLimit: 250_000});
+            await strategyFactory.checkUpkeepTEST(pairs[targetToken1.address], {gasLimit: 250_000});
             await ethers.provider.send('evm_increaseTime', [upKeepInterval]);
             await ethers.provider.send('evm_mine');
             blockNum = await ethers.provider.getBlockNumber();
             block = await ethers.provider.getBlock(blockNum);
             timestamp = block.timestamp;
+            await strategyFactory.checkUpkeepTEST(pairs[targetToken2.address], {gasLimit: 250_000});
         }
 
     });
@@ -114,7 +116,7 @@ describe("withdrawTarget()", function () {
                                              .revertedWith("Amount exceeds balance");
     });
 
-    // Naive local test (send targetToken1 balance to contract for user to withdraw)
+    // Naive local test (sent targetToken1 balance to contract for user to withdraw)
     it("Function should allow user to withdrawal full target asset balances", async function () {
         const amount = deposit1_ETH / AssetPrices[1];
         let strategyETH = await strategyFactory.getStrategyDetails(signer1.address, pairs[targetToken1.address]);
@@ -128,9 +130,12 @@ describe("withdrawTarget()", function () {
         assert.equal(0, targetBalanceETH);
     });
 
+    // Naive local test (sent targetToken2 balance to contract for user to withdraw)
     it("Function should emit event upon withdrawal", async function () {
         const amount = deposit1_BTC / AssetPrices[2];
         const amountBTC = ethers.utils.parseUnits((amount).toString(), 18);
+        strategyBTC = await strategyFactory.getStrategyDetails(signer1.address, pairs[targetToken2.address]);
+        targetBalanceBTC = parseFloat(ethers.utils.formatUnits(strategyBTC.targetBalance, 18));
         await expect(strategyFactory.withdrawTarget(pairs[targetToken2.address], amountBTC))
                                              .to.emit(strategyFactory, "Withdrawal")
                                              .withArgs(signer1.address, amountBTC);

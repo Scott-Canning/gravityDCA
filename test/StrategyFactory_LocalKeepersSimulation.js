@@ -1,5 +1,6 @@
 const { assert } = require("chai");
 const { ethers } = require("hardhat");
+//const { hrtime } = require("process");
 
 
 describe("Local Upkeep Simulation", function () {
@@ -48,7 +49,7 @@ describe("Local Upkeep Simulation", function () {
     const purchaseAmount5 = ethers.utils.parseUnits(purchase5.toString(), 18);
 
     let strategyFactory, sourceToken, targetToken1, targetToken2, targetToken3, 
-        signer1, signer2, signer3, signer4, signer5;
+        signer1, signer2, signer3, signer4, signer5, pair1Id, pair2Id, pair3Id;
 
     let AssetPrices = [0, 2000, 30000, 1]; // null, "ETH", "BTC", "MATIC"
 
@@ -81,19 +82,19 @@ describe("Local Upkeep Simulation", function () {
         // Set pairs
         await strategyFactory.setPair(sourceToken.address, targetToken1.address);
         const getPair1Tx = await strategyFactory.getPairId(sourceToken.address, targetToken1.address);
-        const pair1Id  = ethers.BigNumber.from(getPair1Tx).toNumber();
+        pair1Id  = ethers.BigNumber.from(getPair1Tx).toNumber();
         pairs[targetToken1.address] = pair1Id;
         reversePairs[pair1Id] = targetToken1.address;
 
         await strategyFactory.setPair(sourceToken.address, targetToken2.address);
         const getPair2Tx = await strategyFactory.getPairId(sourceToken.address, targetToken2.address);
-        const pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
+        pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
         pairs[targetToken2.address] = pair2Id;
         reversePairs[pair2Id] = targetToken2.address;
 
         await strategyFactory.setPair(sourceToken.address, targetToken3.address);
         const getPair3Tx = await strategyFactory.getPairId(sourceToken.address, targetToken3.address);
-        const pair3Id = ethers.BigNumber.from(getPair3Tx).toNumber();
+        pair3Id = ethers.BigNumber.from(getPair3Tx).toNumber();
         pairs[targetToken3.address] = pair3Id;
         reversePairs[pair3Id] = targetToken3.address;
 
@@ -114,60 +115,61 @@ describe("Local Upkeep Simulation", function () {
         // Signer 1 initiates ETH strategy
         await sourceToken.approve(strategyFactory.address, depositAmount1_ETH);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                            targetToken1.address,
-                                            depositAmount1_ETH,
-                                            interval1_ETH,
-                                            purchaseAmount1_ETH);
+                                                  targetToken1.address,
+                                                  depositAmount1_ETH,
+                                                  interval1_ETH,
+                                                  purchaseAmount1_ETH);
 
         // Signer 1 initiates BTC strategy
         await sourceToken.approve(strategyFactory.address, depositAmount1_BTC);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                            targetToken2.address,
-                                            depositAmount1_BTC,
-                                            interval1_BTC,
-                                            purchaseAmount1_BTC);
+                                                  targetToken2.address,
+                                                  depositAmount1_BTC,
+                                                  interval1_BTC,
+                                                  purchaseAmount1_BTC);
 
         // Signer 2 initiates strategy
         await sourceToken.connect(signer2).approve(strategyFactory.address, depositAmount2);
         await strategyFactory.connect(signer2).initiateNewStrategy(sourceToken.address,
-                                                            targetToken2.address,
-                                                            depositAmount2,
-                                                            interval2,
-                                                            purchaseAmount2);
+                                                                   targetToken2.address,
+                                                                   depositAmount2,
+                                                                   interval2,
+                                                                   purchaseAmount2);
         
         // Signer 3 initiates strategy
         await sourceToken.connect(signer3).approve(strategyFactory.address, depositAmount3);
         await strategyFactory.connect(signer3).initiateNewStrategy(sourceToken.address,
-                                                            targetToken1.address,
-                                                            depositAmount3,
-                                                            interval3,
-                                                            purchaseAmount3);
+                                                                   targetToken1.address,
+                                                                   depositAmount3,
+                                                                   interval3,
+                                                                   purchaseAmount3);
 
         // Signer 4 initiates strategy
         await sourceToken.connect(signer4).approve(strategyFactory.address, depositAmount4);
         await strategyFactory.connect(signer4).initiateNewStrategy(sourceToken.address,
-                                                            targetToken2.address,
-                                                            depositAmount4,
-                                                            interval4,
-                                                            purchaseAmount4);
+                                                                   targetToken2.address,
+                                                                   depositAmount4,
+                                                                   interval4,
+                                                                   purchaseAmount4);
 
         // Signer 5 initiates strategy
         await sourceToken.connect(signer5).approve(strategyFactory.address, depositAmount5);
         await strategyFactory.connect(signer5).initiateNewStrategy(sourceToken.address,
-                                                            targetToken3.address,
-                                                            depositAmount5,
-                                                            interval5,
-                                                            purchaseAmount5);
+                                                                   targetToken3.address,
+                                                                   depositAmount5,
+                                                                   interval5,
+                                                                   purchaseAmount5);
     });
 
     it("Simulated strategy initiations for multiple user strategies purchasing different tokens should produce deterministic target balances", async function () {
         let blockNum = await ethers.provider.getBlockNumber();
         let block = await ethers.provider.getBlock(blockNum);
         let timestamp = block.timestamp;
-
-        let endTimestamp = timestamp + (((depositAmount5 / purchaseAmount5) * interval5 + 2) * upKeepInterval);
+        let endTimestamp = timestamp + (((depositAmount5 / purchaseAmount5 + 2) * interval5) * upKeepInterval);
         while(timestamp <= endTimestamp) {
-            await strategyFactory.checkUpkeepTEST({gasLimit: 1_250_000});
+            await strategyFactory.checkUpkeepTEST(pair1Id, {gasLimit: 1_250_000});
+            await strategyFactory.checkUpkeepTEST(pair2Id, {gasLimit: 1_250_000});
+            await strategyFactory.checkUpkeepTEST(pair3Id, {gasLimit: 1_250_000});
             await ethers.provider.send('evm_increaseTime', [upKeepInterval]);
             await ethers.provider.send('evm_mine');
             blockNum = await ethers.provider.getBlockNumber();
@@ -175,7 +177,7 @@ describe("Local Upkeep Simulation", function () {
             timestamp = block.timestamp;
         }
 
-        // Expectation target balances
+        // Expected target balances
         let tgtBalSigner1_ETH = deposit1_ETH / AssetPrices[1];
         let tgtBalSigner1_BTC = deposit1_BTC / AssetPrices[2];
         let tgtBalSigner2_BTC = deposit2 / AssetPrices[2];

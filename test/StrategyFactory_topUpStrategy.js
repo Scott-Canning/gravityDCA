@@ -43,7 +43,7 @@ describe("topUpStrategy()", function () {
     const topUpAmount4 = ethers.utils.parseUnits(topUp4.toString(), 18);
 
     let strategyFactory, sourceToken, targetToken1, targetToken2, targetToken3,
-        signer1, signer2, signer3, signer4;
+        signer1, signer2, signer3, signer4, pair1Id, pair2Id;
 
     before("Deploy testing tokens and StrategyFactory.sol", async function () { 
         // Deploy ERC20 source token
@@ -74,13 +74,13 @@ describe("topUpStrategy()", function () {
         // Set pairs
         await strategyFactory.setPair(sourceToken.address, targetToken1.address);
         const getPair1Tx = await strategyFactory.getPairId(sourceToken.address, targetToken1.address);
-        const pair1Id  = ethers.BigNumber.from(getPair1Tx).toNumber();
+        pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
         pairs[targetToken1.address] = pair1Id;
         reversePairs[pair1Id] = targetToken1.address;
 
         await strategyFactory.setPair(sourceToken.address, targetToken2.address);
         const getPair2Tx = await strategyFactory.getPairId(sourceToken.address, targetToken2.address);
-        const pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
+        pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
         pairs[targetToken2.address] = pair2Id;
         reversePairs[pair2Id] = targetToken2.address;
 
@@ -133,7 +133,7 @@ describe("topUpStrategy()", function () {
     it("Function should correctly populate purchase orders after user tops up existing strategy", async function () {
         // Assumes user had a single strategy
         for(let i = 0; i < ((deposit1_ETH + topUp1_ETH) / purchase1_ETH); i++) {
-            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
+            let purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i, pairs[targetToken1.address]);
             for(let j = 0; j < purchaseOrders.length; j++) {
                 if(purchaseOrders[j].user === signer1.address) {
                     let _targetAsset = reversePairs[purchaseOrders[j].pairId];
