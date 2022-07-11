@@ -42,7 +42,7 @@ describe("accumulatePurchaseOrders()", function () {
     const purchaseAmount5 = ethers.utils.parseUnits(purchase5.toString(), 18);
 
     let strategyFactory, sourceToken, targetToken1, targetToken2, 
-        signer1, signer2, signer3, signer4, signer5;
+        signer1, signer2, signer3, signer4, signer5, pair1Id, pair2Id;
 
     before("Deploy testing tokens and StrategyFactory.sol", async function () { 
         // Deploy ERC20 source token
@@ -68,13 +68,13 @@ describe("accumulatePurchaseOrders()", function () {
         // Set pairs
         await strategyFactory.setPair(sourceToken.address, targetToken1.address);
         const getPair1Tx = await strategyFactory.getPairId(sourceToken.address, targetToken1.address);
-        const pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
+        pair1Id = ethers.BigNumber.from(getPair1Tx).toNumber();
         pairs[targetToken1.address] = pair1Id;
         reversePairs[pair1Id] = targetToken1.address;
 
         await strategyFactory.setPair(sourceToken.address, targetToken2.address);
         const getPair2Tx = await strategyFactory.getPairId(sourceToken.address, targetToken2.address);
-        const pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
+        pair2Id = ethers.BigNumber.from(getPair2Tx).toNumber();
         pairs[targetToken2.address] = pair2Id;
         reversePairs[pair2Id] = targetToken2.address;
 
@@ -95,62 +95,64 @@ describe("accumulatePurchaseOrders()", function () {
         // Signer 1 initiates strategy
         await sourceToken.approve(strategyFactory.address, depositAmount1);
         await strategyFactory.initiateNewStrategy(sourceToken.address,
-                                                targetToken1.address,
-                                                depositAmount1,
-                                                interval1,
-                                                purchaseAmount1);
+                                                  targetToken1.address,
+                                                  depositAmount1,
+                                                  interval1,
+                                                  purchaseAmount1);
 
         // Signer 2 initiates strategy
         await sourceToken.connect(signer2).approve(strategyFactory.address, depositAmount2);
         await strategyFactory.connect(signer2).initiateNewStrategy(sourceToken.address,
-                                                                targetToken2.address,
-                                                                depositAmount2,
-                                                                interval2,
-                                                                purchaseAmount2);
+                                                                   targetToken2.address,
+                                                                   depositAmount2,
+                                                                   interval2,
+                                                                   purchaseAmount2);
         
         // Signer 3 initiates strategy
         await sourceToken.connect(signer3).approve(strategyFactory.address, depositAmount3);
         await strategyFactory.connect(signer3).initiateNewStrategy(sourceToken.address,
-                                                                targetToken1.address,
-                                                                depositAmount3,
-                                                                interval3,
-                                                                purchaseAmount3);
+                                                                   targetToken1.address,
+                                                                   depositAmount3,
+                                                                   interval3,
+                                                                   purchaseAmount3);
 
         // Signer 4 initiates strategy
         await sourceToken.connect(signer4).approve(strategyFactory.address, depositAmount4);
         await strategyFactory.connect(signer4).initiateNewStrategy(sourceToken.address,
-                                                                targetToken2.address,
-                                                                depositAmount4,
-                                                                interval4,
-                                                                purchaseAmount4);
+                                                                   targetToken2.address,
+                                                                   depositAmount4,
+                                                                   interval4,
+                                                                   purchaseAmount4);
 
         // Signer 5 initiates strategy
         await sourceToken.connect(signer5).approve(strategyFactory.address, depositAmount5);
         await strategyFactory.connect(signer5).initiateNewStrategy(sourceToken.address,
-                                                                targetToken1.address,
-                                                                depositAmount5,
-                                                                interval5,
-                                                                purchaseAmount5);
+                                                                   targetToken1.address,
+                                                                   depositAmount5,
+                                                                   interval5,
+                                                                   purchaseAmount5);
     });
 
     // Only tests accumulatePurchaseOrders(), i.e., circumvents swapping and thus values should be equivalent
     it("Purchase orders for each slot should be equivalent to total deposits at each slot", async function () {
         for(let i = 1; i < (interval5 * (depositAmount5 / purchaseAmount5)) + 1; i++) {
-            const purchaseOrders = await strategyFactory.getPurchaseOrderDetails(i);
+            const purchaseOrdersToken1 = await strategyFactory.getPurchaseOrderDetails(i, pair1Id);
+            const purchaseOrdersToken2 = await strategyFactory.getPurchaseOrderDetails(i, pair2Id);
             let targetToken1Total = 0;
             let targetToken2Total = 0;
-            for(let j = 0; j < purchaseOrders.length; j++) {
-                if(reversePairs[purchaseOrders[j].pairId] === targetToken1.address) {
-                    targetToken1Total += parseInt(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));
-                }
-                else if (reversePairs[purchaseOrders[j].pairId] === targetToken2.address) {
-                    targetToken2Total += parseInt(ethers.utils.formatUnits(purchaseOrders[j].amount, 18));
-                }
+
+            for(let j = 0; j < purchaseOrdersToken1.length; j++) {
+                targetToken1Total += parseInt(ethers.utils.formatUnits(purchaseOrdersToken1[j].amount, 18));
             }
-            const accPurchaseOrder = await strategyFactory.accumulatePurchaseOrders(i);
-            const [ _, t1, t2 ] = accPurchaseOrder; // Note: first index is empty given pairId's are 1-based
-            const _targetToken1Total = parseInt(ethers.utils.formatUnits(t1, 18));
-            const _targetToken2Total = parseInt(ethers.utils.formatUnits(t2, 18));
+
+            for(let k = 0; k < purchaseOrdersToken2.length; k++) {
+                targetToken2Total += parseInt(ethers.utils.formatUnits(purchaseOrdersToken2[k].amount, 18));
+            }
+
+            const accPurchaseOrderToken1 = await strategyFactory.accumulatePurchaseOrders(i, pair1Id);
+            const accPurchaseOrderToken2 = await strategyFactory.accumulatePurchaseOrders(i, pair2Id);
+            const _targetToken1Total = parseInt(ethers.utils.formatUnits(accPurchaseOrderToken1, 18));
+            const _targetToken2Total = parseInt(ethers.utils.formatUnits(accPurchaseOrderToken2, 18));
             assert.equal(_targetToken1Total, targetToken1Total);
             assert.equal(_targetToken2Total, targetToken2Total);
         }

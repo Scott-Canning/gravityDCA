@@ -15,21 +15,26 @@ import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
  * withdrawal.
  */
 contract StrategyFactory is Ownable {
-    /// [TESTING]
+    /// @notice [TESTING]
     bool public localTesting = true;
-    /// [TESTING]
     uint public purchaseSlot;
     uint public lastTimeStamp;
     uint public immutable upKeepInterval;
     uint public fee;
-    uint public maxDiscount = 99;
+    uint public slippageFactor = 99;
     uint public minPurchaseAmount = 100e18;
     
-    /// @notice pool fee set to 0.3%
+    /// @notice Ensures all swaps are executed if necessary before incrementing purchase slot and lastTimeStamp
+    uint public swapIndex = 1;
+    
+    /// @notice Tracks first swap timestamp of purchase slot to maintain daily swap cadence
+    uint public firstTimeStamp;
+    
+    /// @notice Pool fee set to 0.3%
     uint24 public constant poolFee = 3000;                      
     ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
 
-    /// @notice oracle pricefeed
+    /// @notice Oracle pricefeed
     AggregatorV3Interface internal priceFeed;
 
     /**
@@ -40,9 +45,9 @@ contract StrategyFactory is Ownable {
     
     /**
     * @notice Mapping for each purchase slot's purchase order array
-    * ( day's purchase slot => array of purchase orders )
+    * ( day's purchase slot => (pairId => array of purchase orders ) )
     */     
-    mapping (uint => PurchaseOrder[]) public purchaseOrders;
+    mapping (uint => mapping(uint => PurchaseOrder[])) public purchaseOrders;
 
     /**
     * @notice Forward mapping for a pair's addresses to id
@@ -116,13 +121,200 @@ contract StrategyFactory is Ownable {
     /**
      * @notice 'purchaseOrders' mapping getter
      * @param slot Purchase slot for which details are being sought
-     * @return PurchaseOrder array containing all purchase orders of the passed purchase slot
+     * @param pairId The pairId for which details are being sought
+     * @return PurchaseOrder Array containing all purchase orders of the passed purchase slot
      */
-    function getPurchaseOrderDetails(uint slot) public view returns (PurchaseOrder[] memory) {
-        return purchaseOrders[slot];
+    function getPurchaseOrderDetails(uint slot, uint pairId) public view returns (PurchaseOrder[] memory) {
+        return purchaseOrders[slot][pairId];
     }
 
     /**
+     * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
+     * @param slot The purchase slot accumulated purchase amounts are being sought for
+     * @param pairId The pairId accumulated purchase amounts are being sought for
+     */
+    function accumulatePurchaseOrders(uint slot, uint pairId) public view returns (uint) {
+        uint _total;
+        for(uint i = 0; i < purchaseOrders[slot][pairId].length; i++) {
+            _total += purchaseOrders[slot][pairId][i].amount;
+        }
+        return _total;
+    }
+    /**
+     * @notice Initiates new dollar cost strategy based on user's configuration
+     * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
+     * @param targetAsset Asset the user's strategy will be purchasing
+     * @param sourceBalance Deposit amount of the source asset
+     * @param interval Defines daily cadence of target asset purchases
+     * @param purchaseAmount Defines amount to be purchased at each interval
+     * note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
+     * strategy at first interval.
+     */
+    function initiateNewStrategy(address sourceAsset, address targetAsset, uint sourceBalance, uint interval, uint purchaseAmount) public {
+        uint _pairId = pairs[sourceAsset][targetAsset];
+        require(_pairId > 0, "Pair does not exist");
+        require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy");
+        require(interval == 1 || interval == 7 || interval == 14 || interval == 21 || interval == 30, "Unsupported interval");
+        depositSource(sourceAsset, sourceBalance);
+
+        // [TESTING]
+        if(!localTesting) {
+            int sourceUSD = getLatestPrice(sourceAsset);
+            uint purchaseAmountUSD = uint(sourceUSD) * purchaseAmount / 1e8;
+            require(purchaseAmountUSD >= minPurchaseAmount, "Purchase amount below minimum");
+        }
+
+
+        // Incur fee
+        uint _balance = sourceBalance;
+        if(fee > 0) {
+            _balance = incurFee(sourceAsset, sourceBalance);
+        }
+
+        // Calculate purchases remaining and account for remainder purchase amounts
+        uint _purchasesRemaining = _balance / purchaseAmount;
+        uint _remainder;
+        if((_balance % purchaseAmount) > 0) {
+            _remainder = _balance - (_purchasesRemaining * purchaseAmount);
+            _purchasesRemaining += 1;
+        }
+
+        // Target balance carries over if existing user initiates new strategy
+        uint _targetBalance = 0;
+        if(accounts[msg.sender][_pairId].targetBalance > 0){
+            _targetBalance += accounts[msg.sender][_pairId].targetBalance;
+        }
+
+        accounts[msg.sender][_pairId] = Strategy(purchaseSlot + interval,
+                                                 0,
+                                                 interval,
+                                                 purchaseAmount,
+                                                 _purchasesRemaining
+                                                 );
+
+        // Populate purchaseOrders mapping
+        uint _currentSlot = purchaseSlot;
+        for(uint i = 1; i <= _purchasesRemaining; i++) {
+            uint _purchaseSlot = _currentSlot + (interval * i);
+            if(_purchasesRemaining == i && _remainder > 0) {
+                purchaseOrders[_purchaseSlot][_pairId].push(PurchaseOrder(msg.sender, _remainder, _pairId));
+            } else {
+                purchaseOrders[_purchaseSlot][_pairId].push(PurchaseOrder(msg.sender, purchaseAmount, _pairId));
+            }
+        }
+        emit StrategyInitiated(msg.sender, purchaseSlot + interval);
+    }
+
+    /**
+     * @notice Tops up users existing strategy with additional units of the source asset
+     * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
+     * @param targetAsset Asset the user's strategy will be purchasing
+     * @param topUpAmount Defines amount to be purchased at each interval
+     * note:
+     * - Population of the purchaseOrders mapping uses 0-based indexing to top up an existing
+     *   strategy starting at the _slotOffset
+     * - Function first checks for a purchaseAmount shortfall in the last purchase slot of the 
+     *   user's existing strategy and if one exists, it fills that purchase slot and updates the 
+     *   topUpAmount accordingly
+     */
+    function topUpStrategy(address sourceAsset, address targetAsset, uint topUpAmount) public payable {
+        uint _pairId = pairs[sourceAsset][targetAsset];
+        require(_pairId > 0, "Pair does not exist");
+        require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "No existing strategy for pair");
+        depositSource(sourceAsset, topUpAmount);
+
+        Strategy storage strategy = accounts[msg.sender][_pairId];
+        uint _purchaseAmount = strategy.purchaseAmount;
+        // [TESTING]
+        if(!localTesting) {
+            int sourceUSD = getLatestPrice(sourceAsset);
+            uint purchaseAmountUSD = uint(sourceUSD) * _purchaseAmount / 1e8;
+            require(purchaseAmountUSD >= minPurchaseAmount, "Purchase amount below minimum");
+        }
+
+        // Incur fee
+        uint _balance = topUpAmount;
+        if(fee > 0) {
+            _balance = incurFee(sourceAsset, topUpAmount);
+        }
+
+        // Calculate offset starting point for top up purchases and ending point for existing purchase shortfalls
+        uint _slotOffset = strategy.nextSlot + (strategy.purchasesRemaining * strategy.interval);
+        uint _strategyLastSlot = _slotOffset - strategy.interval;
+
+        // If remainder 'shortfall' below purchaseAmount on final purchase slot of existing strategy, fill
+        for(uint i = 0; i < purchaseOrders[_strategyLastSlot][_pairId].length; i++) {
+            if(purchaseOrders[_strategyLastSlot][_pairId][i].user == msg.sender) {
+                if(purchaseOrders[_strategyLastSlot][_pairId][i].pairId == _pairId) {
+                    uint _amountLastSlot = purchaseOrders[_strategyLastSlot][_pairId][i].amount;
+                    if(_amountLastSlot < _purchaseAmount) {
+                        if(_balance > (_purchaseAmount - _amountLastSlot)) {
+                            _balance -= (_purchaseAmount - _amountLastSlot);
+                            purchaseOrders[_strategyLastSlot][_pairId][i].amount = _purchaseAmount;
+                        } else if (_balance < (_purchaseAmount - _amountLastSlot)) {
+                            purchaseOrders[_strategyLastSlot][_pairId][i].amount += _balance;
+                            _balance = 0;
+                        } else {
+                            purchaseOrders[_strategyLastSlot][_pairId][i].amount = _purchaseAmount;
+                            _balance = 0;
+                        }
+                    }
+                    break; // Break once strategy is found
+                }
+            }
+        }
+
+        uint _topUpPurchasesRemaining = _balance / _purchaseAmount;
+        uint _remainder;
+        if((_balance % _purchaseAmount > 0) && (_topUpPurchasesRemaining > 0)) {
+            _remainder = _balance - (_topUpPurchasesRemaining * _purchaseAmount);
+            _topUpPurchasesRemaining += 1;
+        }
+
+        uint _purchaseSlot = _slotOffset;
+        for(uint i = 0; i < _topUpPurchasesRemaining; i++) {
+            _purchaseSlot = _slotOffset + (strategy.interval * i);
+            if((_topUpPurchasesRemaining - 1) == i && _remainder > 0) {
+                purchaseOrders[_purchaseSlot][_pairId].push(PurchaseOrder(msg.sender, _remainder, _pairId));
+            } else {
+                purchaseOrders[_purchaseSlot][_pairId].push(PurchaseOrder(msg.sender, _purchaseAmount, _pairId));
+            }
+        }
+        strategy.purchasesRemaining += _topUpPurchasesRemaining;
+        emit StrategyToppedUp(msg.sender, _balance);
+    }
+
+    /**
+     * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
+     * @param token address of ERC20 token to be deposited into contract
+     * @param amount amount of ERC20 token to be deposited into contract
+     */
+    function depositSource(address token, uint256 amount) internal {
+        (bool success) = IERC20(token).transferFrom(msg.sender, address(this), amount);
+        require(success, "Deposit unsuccessful");
+        emit Deposited(block.timestamp, msg.sender, amount);
+    }
+
+    /**
+     * @notice Allows users to withdrawal target asset
+     * @param pairId pairId of the strategy user is withdrawing the target asset from
+     * @param amount Amount of the target asset the user is withdrawing
+     * note:
+     * - deletes stored strategy details if user withdraws full target balance
+     */
+    function withdrawTarget(uint pairId, uint amount) external {
+        uint _balance = accounts[msg.sender][pairId].targetBalance;
+        require(_balance >= amount, "Amount exceeds balance");
+        accounts[msg.sender][pairId].targetBalance -= amount;
+        (bool success) = IERC20(reversePairs[pairId].toToken).transfer(msg.sender, amount);
+        require(success, "Withdrawal unsuccessful");
+        if(_balance == amount) {
+            delete accounts[msg.sender][pairId];
+        }
+        emit Withdrawal(msg.sender, amount);
+    }
+
+   /**
      * @notice Enables new strategy pairing
      * @param fromToken Token that funds _toToken purchase
      * @param toToken Token that gets purchased with _fromToken
@@ -174,201 +366,31 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice Sets pool path for V3 swapping [TESTING]
-     * - in production would be only owner
+     * @notice Sets pair pool path for V3 swapping [TESTING]
+     * NOTE in production would be only owner
      */
     function setPath(uint24 pairId, uint24 params,
                      address assetA, uint24 fee1, 
                      address assetB, uint24 fee2, 
                      address assetC, uint24 fee3, 
                      address assetD)
-                     public {
-        if(params == 5) {
+                     external onlyOwner {
+        if(params == 3) {
+            reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB);
+        } else if(params == 5) {
             reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB, fee2, assetC);
         } else if (params == 7) {
             reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB, fee2, assetC, fee3, assetD);
         }
     }
 
-    /**
-     * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
-     * @param slot The purchase slot accumulated purchase amounts of target assets are being sought for
+     /**
+     * @notice Get pair pool path
+     * @param pairId pairId of pair path being sought
+     * @return Path
      */
-    function accumulatePurchaseOrders(uint slot) public view returns (uint[] memory) {
-        uint[] memory _totals = new uint[](reversePairs.length);
-        for(uint i = 0; i < purchaseOrders[slot].length; i++) {
-            _totals[purchaseOrders[slot][i].pairId] += purchaseOrders[slot][i].amount;
-        }
-        return _totals;
-    }
-
-    /**
-     * @notice Initiates new dollar cost strategy based on user's configuration
-     * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
-     * @param targetAsset Asset the user's strategy will be purchasing
-     * @param sourceBalance Deposit amount of the source asset
-     * @param interval Defines daily cadence of target asset purchases
-     * @param purchaseAmount Defines amount to be purchased at each interval
-     * note: Population of the purchaseOrders mapping uses 1-based indexing to initialize 
-     * strategy at first interval.
-     */
-    function initiateNewStrategy(address sourceAsset, address targetAsset, uint sourceBalance, uint interval, uint purchaseAmount) public {
-        uint _pairId = pairs[sourceAsset][targetAsset];
-        require(_pairId > 0, "Pair does not exist");
-        require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy");
-        require(interval == 1 || interval == 7 || interval == 14 || interval == 21 || interval == 30, "Unsupported interval");
-        depositSource(sourceAsset, sourceBalance);
-
-        // [TESTING]
-        if(!localTesting) {
-            int sourceUSD = getLatestPrice(sourceAsset);
-            uint purchaseAmountUSD = uint(sourceUSD) * purchaseAmount / 1e8;
-            require(purchaseAmountUSD >= minPurchaseAmount, "Purchase amount below minimum");
-        }
-
-
-        // Incur fee
-        uint _balance = sourceBalance;
-        if(fee > 0) {
-            _balance = incurFee(sourceAsset, sourceBalance);
-        }
-
-        // Calculate purchases remaining and account for remainder purchase amounts
-        uint _purchasesRemaining = _balance / purchaseAmount;
-        uint _remainder;
-        if((_balance % purchaseAmount) > 0) {
-            _remainder = _balance - (_purchasesRemaining * purchaseAmount);
-            _purchasesRemaining += 1;
-        }
-
-        // Target balance carries over if existing user initiates new strategy
-        uint _targetBalance = 0;
-        if(accounts[msg.sender][_pairId].targetBalance > 0){
-            _targetBalance += accounts[msg.sender][_pairId].targetBalance;
-        }
-
-        accounts[msg.sender][_pairId] = Strategy(purchaseSlot + interval,
-                                                 //_balance,
-                                                 0,
-                                                 interval,
-                                                 purchaseAmount,
-                                                 _purchasesRemaining
-                                                 );
-
-        // Populate purchaseOrders mapping
-        uint _currentSlot = purchaseSlot;
-        for(uint i = 1; i <= _purchasesRemaining; i++) {
-            uint _purchaseSlot = _currentSlot + (interval * i);
-            if(_purchasesRemaining == i && _remainder > 0) {
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _remainder, _pairId));
-            } else {
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, purchaseAmount, _pairId));
-            }
-        }
-        emit StrategyInitiated(msg.sender, purchaseSlot + interval);
-    }
-
-    /**
-     * @notice Tops up users existing strategy with additional units of the source asset
-     * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
-     * @param targetAsset Asset the user's strategy will be purchasing
-     * @param topUpAmount Defines amount to be purchased at each interval
-     * note:
-     * - Population of the purchaseOrders mapping uses 0-based indexing to top up an existing
-     *   strategy starting at the _slotOffset
-     * - Function first checks for a purchaseAmount shortfall in the last purchase slot of the 
-     *   user's existing strategy and if one exists, it fills that purchase slot and updates the 
-     *   topUpAmount accordingly
-     */
-    function topUpStrategy(address sourceAsset, address targetAsset, uint topUpAmount) public payable {
-        uint _pairId = pairs[sourceAsset][targetAsset];
-        require(_pairId > 0, "Pair does not exist");
-        require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "No existing strategy for pair");
-        depositSource(sourceAsset, topUpAmount);
-
-        Strategy storage strategy = accounts[msg.sender][_pairId];
-        uint _purchaseAmount = strategy.purchaseAmount;
-        // [TESTING]
-        if(!localTesting) {
-            int sourceUSD = getLatestPrice(sourceAsset);
-            uint purchaseAmountUSD = uint(sourceUSD) * _purchaseAmount / 1e8;
-            require(purchaseAmountUSD >= minPurchaseAmount, "Purchase amount below minimum");
-        }
-
-        // Incur fee
-        uint _balance = topUpAmount;
-        if(fee > 0) {
-            _balance = incurFee(sourceAsset, topUpAmount);
-        }
-
-        // Calculate offset starting point for top up purchases and ending point for existing purchase shortfalls
-        uint _slotOffset = strategy.nextSlot + (strategy.purchasesRemaining * strategy.interval);
-        uint _strategyLastSlot = _slotOffset - strategy.interval;
-
-        // If remainder 'shortfall' below purchaseAmount on final purchase slot of existing strategy, fill
-        for(uint i = 0; i < purchaseOrders[_strategyLastSlot].length; i++) {
-            if(purchaseOrders[_strategyLastSlot][i].user == msg.sender) {
-                if(purchaseOrders[_strategyLastSlot][i].pairId == _pairId) {
-                    uint _amountLastSlot = purchaseOrders[_strategyLastSlot][i].amount;
-                    if(_amountLastSlot < _purchaseAmount) {
-                        if(_balance > (_purchaseAmount - _amountLastSlot)) {
-                            _balance -= (_purchaseAmount - _amountLastSlot);
-                            purchaseOrders[_strategyLastSlot][i].amount = _purchaseAmount;
-                        } else if (_balance < (_purchaseAmount - _amountLastSlot)) {
-                            purchaseOrders[_strategyLastSlot][i].amount += _balance;
-                            _balance = 0;
-                        } else {
-                            purchaseOrders[_strategyLastSlot][i].amount = _purchaseAmount;
-                            _balance = 0;
-                        }
-                    }
-                    break; // Break once strategy is found
-                }
-            }
-        }
-
-        uint _topUpPurchasesRemaining = _balance / _purchaseAmount;
-        uint _remainder;
-        if((_balance % _purchaseAmount > 0) && (_topUpPurchasesRemaining > 0)) {
-            _remainder = _balance - (_topUpPurchasesRemaining * _purchaseAmount);
-            _topUpPurchasesRemaining += 1;
-        }
-
-        uint _purchaseSlot = _slotOffset;
-        for(uint i = 0; i < _topUpPurchasesRemaining; i++) {
-            _purchaseSlot = _slotOffset + (strategy.interval * i);
-            if((_topUpPurchasesRemaining - 1) == i && _remainder > 0) {
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _remainder, _pairId));
-            } else {
-                purchaseOrders[_purchaseSlot].push(PurchaseOrder(msg.sender, _purchaseAmount, _pairId));
-            }
-        }
-        strategy.purchasesRemaining += _topUpPurchasesRemaining;
-        emit StrategyToppedUp(msg.sender, _balance);
-    }
-
-    /**
-     * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
-     * @param token address of ERC20 token to be deposited into contract
-     * @param amount amount of ERC20 token to be deposited into contract
-     */
-    function depositSource(address token, uint256 amount) internal {
-        (bool success) = IERC20(token).transferFrom(msg.sender, address(this), amount);
-        require(success, "Deposit unsuccessful");
-        emit Deposited(block.timestamp, msg.sender, amount);
-    }
-
-    /**
-     * @notice Allows users to withdrawal target asset
-     * @param pairId pairId of the strategy user is withdrawing the target asset from
-     * @param amount Amount of the target asset the user is withdrawing
-     */
-    function withdrawTarget(uint pairId, uint amount) external {
-        require(accounts[msg.sender][pairId].targetBalance >= amount, "Amount exceeds balance");
-        accounts[msg.sender][pairId].targetBalance -= amount;
-        (bool success) = IERC20(reversePairs[pairId].toToken).transfer(msg.sender, amount);
-        require(success, "Withdrawal unsuccessful");
-        emit Withdrawal(msg.sender, amount);
+    function getPath(uint pairId) public view returns (bytes memory) {
+        return reversePairs[pairId].path;
     }
 
     /**
@@ -400,11 +422,20 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice Max discount setter
-     * @param _maxDiscount New max discount value
+     * @notice Price fee getter
+     * @param token Address of token price feed address is being sought for
+     * @return Price feed address for token
      */
-    function setMaxDiscount(uint _maxDiscount) external onlyOwner {
-         maxDiscount = _maxDiscount;
+    function getPriceFeed(address token) public view returns (address) {
+        return priceFeeds[token];
+    }
+
+    /**
+     * @notice Max slippage setter
+     * @param _slippageFactor New slippage factor value
+     */
+    function setSlippageFactor(uint _slippageFactor) external onlyOwner {
+         slippageFactor = _slippageFactor;
     }
 
     /**
@@ -434,7 +465,7 @@ contract StrategyFactory is Ownable {
         TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
         int _tokenInPrice = getLatestPrice(tokenIn);
         int _tokenOutPrice = getLatestPrice(tokenOut);
-        uint amountOutMin = ((amountIn * uint(_tokenInPrice)) / uint(_tokenOutPrice) * maxDiscount) / 100;
+        uint amountOutMin = ((amountIn * uint(_tokenInPrice)) / uint(_tokenOutPrice) * slippageFactor) / 100;
 
         ISwapRouter.ExactInputParams memory params =
             ISwapRouter.ExactInputParams({
@@ -469,59 +500,71 @@ contract StrategyFactory is Ownable {
 
 
     /// @notice [TESTING] checkUpkeep keeper integration placeholder function for testing purposes
-    function checkUpkeepTEST() external {
-        uint _now = block.timestamp;
-        if((_now - lastTimeStamp) > upKeepInterval) {
-            performUpkeepTEST();
+    function checkUpkeepTEST(uint _pairId /* bytes calldata checkData */) external  {
+        if((block.timestamp - lastTimeStamp) > upKeepInterval){
+            uint _purchaseAmount = accumulatePurchaseOrders(purchaseSlot, _pairId);
+            performUpkeepTEST(_pairId, _purchaseAmount);
+
+            ///////////////// REGISTERED UPKEEP /////////////////
+            // returns (bool upkeepNeeded, bytes memory performData)
+            // upkeepNeeded = true;
+            // uint _pairId = abi.decode(checkData, (uint));
+            // performData = abi.encode(_pairId, purchaseAmount);
+            // return (upkeepNeeded, performData);
+            /////////////////////////////////////////////////////
         }
     }
 
     /// @notice [TESTING] performUpkeep keeper integration placeholder function for testing purposes
-    function performUpkeepTEST() internal {
-        uint _now = block.timestamp;
-        if((_now - lastTimeStamp) > upKeepInterval) {
-            lastTimeStamp = _now;
-            uint _pairCount = reversePairs.length;
-            uint[] memory _pairTrades = accumulatePurchaseOrders(purchaseSlot);
-            uint[] memory _purchased = new uint[](_pairCount);
-            for(uint i = 1; i < _pairCount; i++) {
-                uint _total = _pairTrades[i];
-                if(_total > 0) {
-                    /////////////////////////////////////////////////////
-                    ////////////////////// TESTING //////////////////////
+    function performUpkeepTEST(uint _pairId, uint _purchaseAmount) internal {
+        if ((block.timestamp - lastTimeStamp) > upKeepInterval) {
+            if(swapIndex == 1) {
+                firstTimeStamp = block.timestamp;
+            }
+            uint _purchaseAmountCheck = accumulatePurchaseOrders(purchaseSlot, _pairId);
+            require(_purchaseAmountCheck == _purchaseAmount, "Purchase amount invalid");
+            ///////////////// REGISTERED UPKEEP /////////////////
+            // (uint _pairId, uint purchaseAmount) = abi.decode(performData, (uint, uint));
+            /////////////////////////////////////////////////////
+            uint _purchased;
+            if(_purchaseAmount > 0) {
 
-                    if(localTesting) {
-                        // [SIMULATED LOCAL SWAP]
-                        _purchased[i] += _total / AssetPrices[i];
-                    } else {
-                        // [FORKED MAINNET SWAP]
-                        _purchased[i] = swap(i,
-                                            reversePairs[i].fromToken,
-                                            reversePairs[i].toToken,
-                                            _total);
+                /////////////////////////////////////////////////////
+                ////////////////////// TESTING //////////////////////
+                if(localTesting) {
+                    // [SIMULATED LOCAL SWAP]
+                   _purchased += _purchaseAmount / AssetPrices[_pairId];
+                } else {
+                    // [FORKED MAINNET SWAP]
+                    _purchased = swap(_pairId,
+                                      reversePairs[_pairId].fromToken,
+                                      reversePairs[_pairId].toToken,
+                                      _purchaseAmount);
+                }
+                ////////////////////// TESTING //////////////////////
+                /////////////////////////////////////////////////////                    
+            
+                uint _purchaseSlot = purchaseSlot;
+                for(uint i = 0; i < purchaseOrders[_purchaseSlot][_pairId].length; i++) {
+                    address _user = purchaseOrders[_purchaseSlot][_pairId][i].user;
+                    accounts[_user][_pairId].purchasesRemaining -= 1;
+                    accounts[_user][_pairId].targetBalance += purchaseOrders[_purchaseSlot][_pairId][i].amount * 
+                                                              _purchased / 
+                                                              _purchaseAmount;
+                    accounts[_user][_pairId].nextSlot = purchaseSlot + accounts[_user][_pairId].interval;
+                    if(accounts[_user][_pairId].purchasesRemaining == 0) {
+                        accounts[_user][_pairId].interval = 0;
                     }
-
-                    ////////////////////// TESTING //////////////////////
-                    /////////////////////////////////////////////////////                    
                 }
             }
-
-            uint _purchaseSlot = purchaseSlot;
-            for(uint i = 0; i < purchaseOrders[_purchaseSlot].length; i++) {
-                address _user = purchaseOrders[_purchaseSlot][i].user;
-                uint _pairId = purchaseOrders[_purchaseSlot][i].pairId;
-                accounts[_user][_pairId].purchasesRemaining -= 1;
-                accounts[_user][_pairId].targetBalance += purchaseOrders[_purchaseSlot][i].amount * 
-                                                          _purchased[_pairId] / 
-                                                          _pairTrades[_pairId];
-                accounts[_user][_pairId].nextSlot = purchaseSlot + accounts[_user][_pairId].interval;
-                if(accounts[_user][_pairId].purchasesRemaining == 0) {
-                    accounts[_user][_pairId].interval = 0;
-                }
+            swapIndex++;
+            delete purchaseOrders[purchaseSlot][_pairId];
+            if(swapIndex == reversePairs.length) {
+                lastTimeStamp = firstTimeStamp;
+                swapIndex = 1;
+                purchaseSlot++;
             }
-            delete purchaseOrders[_purchaseSlot];
         }
-        purchaseSlot++;
     }
 
     ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////

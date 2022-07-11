@@ -48,10 +48,12 @@ async function main() {
         let blockNum = await ethers.provider.getBlockNumber();
         let block = await ethers.provider.getBlock(blockNum);
         let timestamp = block.timestamp;
-        let endTimestamp = timestamp + ((((strategy.deposit / strategy.purchaseAmount) + 2) * strategy.interval) * upKeepInterval);
+        let endTimestamp = timestamp + ((((strategy.deposit / strategy.purchaseAmount) * 3) * strategy.interval) * upKeepInterval);
+        console.log("timestamp:                     ", timestamp);
+        console.log("(endTimestamp - timestamp) / upKeepInterval: ", (endTimestamp - timestamp) / upKeepInterval);
         let purchaseSlot = 0; 
         while(timestamp <= endTimestamp) {
-            await strategyFactory.checkUpkeepTEST({gasLimit: 1_000_000});
+            await strategyFactory.checkUpkeepTEST(strategy.pairId, {gasLimit: 1_000_000});
             purchaseSlot = await strategyFactory.purchaseSlot();
             await ethers.provider.send('evm_increaseTime', [upKeepInterval]);
             await ethers.provider.send('evm_mine');
