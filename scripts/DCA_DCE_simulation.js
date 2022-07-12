@@ -4,6 +4,7 @@ require('dotenv').config();
 const DAI_SIGNER = "0x075e72a5eDf65F0A5f44699c7654C1a76941Ddc8";
 const ZER0 = '0x0000000000000000000000000000000000000000';
 
+// Polygon token addresses
 const pairs = {
     '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063': 'DAI',
     '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619': 'WETH',
@@ -229,7 +230,7 @@ async function main() {
     // User 1 withdraws WETH
     console.log("------------------------------------------------------------");
     let detailsTx = await strategyFactory.getStrategyDetails(user1.signer.address, pair1Id);
-    await strategyFactory.connect(user1.signer).withdrawTarget(pair1Id, detailsTx.targetBalance, {gasLimit: 75000});
+    await strategyFactory.connect(user1.signer).withdrawTarget(pair1Id, detailsTx.targetBalance, {gasLimit: 100000});
     console.log("User 1 withdraws target asset from Strategy 1 - balance: ", ethers.utils.formatUnits(await wETHtoken.balanceOf(user1.signer.address)));
     ////////////////////////////////////////////////////////////////////////////////
 

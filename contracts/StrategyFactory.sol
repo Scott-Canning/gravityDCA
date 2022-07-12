@@ -9,17 +9,22 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
 import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
+interface IUniswapV2Router {
+  function getAmountsOut(uint256 amountIn, address[] memory path) external view returns (uint256[] memory amounts);
+  function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts);
+}
+
 /**
- * @notice Implementation of the Gravity Strategy Factory contract. Handles pair account, 
+ * @notice Implementation of the Gravity Strategy Factory contract. Handles pair accounting, 
  * strategy initiation, strategy topping up, keeper automation, swapping, and target
  * withdrawal.
  */
 contract StrategyFactory is Ownable {
     /// @notice [TESTING]
-    bool public localTesting = true;
+    bool public localTesting = false;
+    uint public immutable upKeepInterval;
     uint public purchaseSlot;
     uint public lastTimeStamp;
-    uint public immutable upKeepInterval;
     uint public fee;
     uint public slippageFactor = 99;
     uint public minPurchaseAmount = 100e18;
@@ -27,12 +32,12 @@ contract StrategyFactory is Ownable {
     /// @notice Ensures all swaps are executed if necessary before incrementing purchase slot and lastTimeStamp
     uint public swapIndex = 1;
     
-    /// @notice Tracks first swap timestamp of purchase slot to maintain daily swap cadence
+    /// @notice Tracks first swap timestamp of purchase slot to maintain daily upkeep cadence
     uint public firstTimeStamp;
     
-    /// @notice Pool fee set to 0.3%
-    uint24 public constant poolFee = 3000;                      
-    ISwapRouter public immutable swapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    /// @notice [TESTING V2 -> QUICKSWAP] 
+    ISwapRouter public immutable swapRouterV3 = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    IUniswapV2Router public immutable swapRouterV2 = IUniswapV2Router(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff);
 
     /// @notice Oracle pricefeed
     AggregatorV3Interface internal priceFeed;
@@ -129,17 +134,18 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice Sums a purchase slot's purchase order for each asset and returns results in an array
+     * @notice Sums a purchase slot's purchase order for pairId and returns result
      * @param slot The purchase slot accumulated purchase amounts are being sought for
      * @param pairId The pairId accumulated purchase amounts are being sought for
+     * @return total Sum of all purchase orders for the purchase slot
      */
-    function accumulatePurchaseOrders(uint slot, uint pairId) public view returns (uint) {
-        uint _total;
+    function accumulatePurchaseOrders(uint slot, uint pairId) public view returns (uint total) {
         for(uint i = 0; i < purchaseOrders[slot][pairId].length; i++) {
-            _total += purchaseOrders[slot][pairId][i].amount;
+            total += purchaseOrders[slot][pairId][i].amount;
         }
-        return _total;
+        return total;
     }
+
     /**
      * @notice Initiates new dollar cost strategy based on user's configuration
      * @param sourceAsset Deposited asset the user's strategy will use to fund future purchases
@@ -163,7 +169,6 @@ contract StrategyFactory is Ownable {
             uint purchaseAmountUSD = uint(sourceUSD) * purchaseAmount / 1e8;
             require(purchaseAmountUSD >= minPurchaseAmount, "Purchase amount below minimum");
         }
-
 
         // Incur fee
         uint _balance = sourceBalance;
@@ -225,7 +230,8 @@ contract StrategyFactory is Ownable {
 
         Strategy storage strategy = accounts[msg.sender][_pairId];
         uint _purchaseAmount = strategy.purchaseAmount;
-        // [TESTING]
+
+        // [TESTING] mainnet fork only
         if(!localTesting) {
             int sourceUSD = getLatestPrice(sourceAsset);
             uint purchaseAmountUSD = uint(sourceUSD) * _purchaseAmount / 1e8;
@@ -314,7 +320,7 @@ contract StrategyFactory is Ownable {
         emit Withdrawal(msg.sender, amount);
     }
 
-   /**
+    /**
      * @notice Enables new strategy pairing
      * @param fromToken Token that funds _toToken purchase
      * @param toToken Token that gets purchased with _fromToken
@@ -384,7 +390,7 @@ contract StrategyFactory is Ownable {
         }
     }
 
-     /**
+    /**
      * @notice Get pair pool path
      * @param pairId pairId of pair path being sought
      * @return Path
@@ -459,10 +465,10 @@ contract StrategyFactory is Ownable {
     ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
 
     /**
-     * NOTE: [TESTING visibility needs to be changed to INTERNAL post
+     * NOTE: [TESTING]
      */
-    function swap(uint pairId, address tokenIn, address tokenOut, uint256 amountIn) public returns (uint256 amountOut) {
-        TransferHelper.safeApprove(tokenIn, address(swapRouter), amountIn);
+    function swapV3(uint pairId, address tokenIn, address tokenOut, uint256 amountIn) internal returns (uint256 amountOut) {
+        TransferHelper.safeApprove(tokenIn, address(swapRouterV3), amountIn);
         int _tokenInPrice = getLatestPrice(tokenIn);
         int _tokenOutPrice = getLatestPrice(tokenOut);
         uint amountOutMin = ((amountIn * uint(_tokenInPrice)) / uint(_tokenOutPrice) * slippageFactor) / 100;
@@ -475,7 +481,32 @@ contract StrategyFactory is Ownable {
                 amountIn: amountIn,
                 amountOutMinimum: amountOutMin
             });
-        amountOut = swapRouter.exactInput(params);
+        amountOut = swapRouterV3.exactInput(params);
+    }
+
+    /**
+     * NOTE: [TESTING] V2 ROUTER FOR QUICKSWAP
+     */
+    function swapV2(address tokenIn, address tokenOut, uint256 amountIn) internal returns (uint256 amountOut) {      
+        IERC20(tokenIn).approve(address(swapRouterV2), amountIn);
+        int _tokenInPrice = getLatestPrice(tokenIn);
+        int _tokenOutPrice = getLatestPrice(tokenOut);
+        uint amountOutMin = ((amountIn * uint(_tokenInPrice)) / uint(_tokenOutPrice) * slippageFactor) / 100;
+
+        address WETH = 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619;
+        address[] memory path;
+        if (tokenIn == WETH || tokenOut == WETH) {
+            path = new address[](2);
+            path[0] = tokenIn;
+            path[1] = tokenOut;
+        } else {
+            path = new address[](3);
+            path[0] = tokenIn;
+            path[1] = WETH;
+            path[2] = tokenOut;
+        }
+        uint[] memory amounts = swapRouterV2.swapExactTokensForTokens(amountIn, amountOutMin, path, address(this), block.timestamp);
+        return amounts[1];
     }
 
     /**
@@ -534,12 +565,18 @@ contract StrategyFactory is Ownable {
                 if(localTesting) {
                     // [SIMULATED LOCAL SWAP]
                    _purchased += _purchaseAmount / AssetPrices[_pairId];
+                // } else {
+                //     // [FORKED MAINNET V3 SWAP]
+                //     _purchased = swapV3(_pairId,
+                //                       reversePairs[_pairId].fromToken,
+                //                       reversePairs[_pairId].toToken,
+                //                       _purchaseAmount);
+                // }
                 } else {
-                    // [FORKED MAINNET SWAP]
-                    _purchased = swap(_pairId,
-                                      reversePairs[_pairId].fromToken,
-                                      reversePairs[_pairId].toToken,
-                                      _purchaseAmount);
+                    // [FORKED MAINNET V2 SWAP]
+                    _purchased = swapV2(reversePairs[_pairId].fromToken,
+                                        reversePairs[_pairId].toToken,
+                                        _purchaseAmount);
                 }
                 ////////////////////// TESTING //////////////////////
                 /////////////////////////////////////////////////////                    

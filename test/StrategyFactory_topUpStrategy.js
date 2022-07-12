@@ -176,20 +176,20 @@ describe("topUpStrategy()", function () {
         assert.equal(expectedPurchasesRemaining, purchasesRemaining);
     });
 
-    it("Function should emit event on topped up strategy", async function () {
+    it("Function should emit event on topped up strategy", async function () {           
         // Signer 4 initiates strategy in targetToken1
         await sourceToken.connect(signer4).approve(strategyFactory.address, depositAmount4);
         await strategyFactory.connect(signer4).initiateNewStrategy(sourceToken.address,
-                                                                   targetToken1.address,
-                                                                   depositAmount4,
-                                                                   interval4,
-                                                                   purchaseAmount4);
+                                                                    targetToken1.address,
+                                                                    depositAmount4,
+                                                                    interval4,
+                                                                    purchaseAmount4);
         
         // Signer 4 topsUp strategy
         await sourceToken.connect(signer4).approve(strategyFactory.address, topUpAmount4);
         await expect(strategyFactory.connect(signer4).topUpStrategy(sourceToken.address,
                                                                     targetToken1.address,
-                                                                    topUpAmount4,))
+                                                                    topUpAmount4))
                                                                     .to.emit(strategyFactory, "StrategyToppedUp")
                                                                     .withArgs(signer4.address, topUpAmount4);
     });
@@ -205,7 +205,7 @@ describe("topUpStrategy()", function () {
         await sourceToken.connect(signer4).approve(strategyFactory.address, topUpAmount4);
         await expect(strategyFactory.connect(signer4).topUpStrategy(sourceToken.address,
                                                                     targetToken1.address,
-                                                                    topUpAmount4,))
+                                                                    topUpAmount4))
                                                                     .to.be
                                                                     .revertedWith("ERC20: transfer amount exceeds balance");
     });
