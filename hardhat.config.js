@@ -20,11 +20,14 @@ module.exports = {
     kovan: {
       url: process.env.KOVAN_URL,
       accounts: [process.env.PRIVATE_KEY],
+    },
+    mumbai: {
+      url: process.env.MUMBAI_URL,
+      accounts: [process.env.PRIVATE_KEY],
     }
   },
   etherscan: {
-    apiKey: {
-      kovan: process.env.ETHERSCAN_KEY
-    }
+    apiKey: process.env.POLYGONSCAN_KEY, //{
+      // kovan: process.env.ETHERSCAN_KEY,
   },
 };

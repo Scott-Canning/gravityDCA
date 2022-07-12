@@ -1,0 +1,28 @@
+// StrategyFactory_Kovan_deploy.js
+const hre = require("hardhat");
+const { ethers } = require('ethers');
+require('dotenv').config();
+
+const upKeepInterval = 120;
+
+async function deploy() {
+  const url = process.env.MUMBAI_URL;
+  const provider = new ethers.providers.JsonRpcProvider(url);
+
+  let privateKey = process.env.PRIVATE_KEY;
+  let wallet = new ethers.Wallet(privateKey, provider);
+
+  let artifacts = await hre.artifacts.readArtifact("StrategyFactory");
+  let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
+  let contract = await factory.deploy(upKeepInterval);
+
+  console.log("Contract address:", contract.address);
+  await contract.deployed();
+}
+
+deploy()
+.then(() => process.exit(0))
+.catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

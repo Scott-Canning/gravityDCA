@@ -117,17 +117,37 @@ describe("withdrawTarget()", function () {
     });
 
     // Naive local test (sent targetToken1 balance to contract for user to withdraw)
-    it("Function should allow user to withdrawal full target asset balances", async function () {
+    it("Function should allow user to withdraw full target asset balances", async function () {
         const amount = deposit1_ETH / AssetPrices[1];
         let strategyETH = await strategyFactory.getStrategyDetails(signer1.address, pairs[targetToken1.address]);
         let targetBalanceETH = parseFloat(ethers.utils.formatUnits(strategyETH.targetBalance, 18));
         assert.equal(amount, targetBalanceETH);
+
+        const userBalanceBefore = ethers.utils.formatUnits(await targetToken1.balanceOf(signer1.address), 18);
 
         const amountETH = ethers.utils.parseUnits((amount).toString(), 18);
         await strategyFactory.withdrawTarget(pairs[targetToken1.address], amountETH);
         strategyETH = await strategyFactory.getStrategyDetails(signer1.address, pairs[targetToken1.address]);
         targetBalanceETH = parseFloat(ethers.utils.formatUnits(strategyETH.targetBalance, 18));
         assert.equal(0, targetBalanceETH);
+ 
+        const userBalanceAfter = ethers.utils.formatUnits(await targetToken1.balanceOf(signer1.address), 18);
+        assert.equal((userBalanceAfter - userBalanceBefore), amount);
+    });
+
+    // Naive local test (sent targetToken1 balance to contract for user to withdraw)
+    it("Function should delete stored strategy if user has fully withdrawn their target asset balance", async function () {
+        const strategyETH = await strategyFactory.getStrategyDetails(signer1.address, pairs[targetToken1.address]);
+        const nextSlot = parseFloat(ethers.utils.formatUnits(strategyETH.nextSlot, 18));
+        const targetBalance = parseFloat(ethers.utils.formatUnits(strategyETH.targetBalance, 18));
+        const interval = parseFloat(ethers.utils.formatUnits(strategyETH.interval, 18));
+        const purchaseAmount = parseFloat(ethers.utils.formatUnits(strategyETH.purchaseAmount, 18));
+        const purchasesRemaining = parseFloat(ethers.utils.formatUnits(strategyETH.purchasesRemaining, 18));
+        assert.equal(0, nextSlot);
+        assert.equal(0, targetBalance);
+        assert.equal(0, interval);
+        assert.equal(0, purchaseAmount);
+        assert.equal(0, purchasesRemaining);
     });
 
     // Naive local test (sent targetToken2 balance to contract for user to withdraw)
