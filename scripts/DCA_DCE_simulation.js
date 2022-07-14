@@ -1,3 +1,7 @@
+// DCA_DCE_simulation.js
+// npx hardhat run scripts/DCA_DCE_simulation.js --network localhost
+// StrategyFactory.sol -> bool public localTesting = true
+
 const hre = require("hardhat");
 require('dotenv').config();
 
@@ -168,30 +172,30 @@ async function main() {
     ////////////////////////////////////////////////////////////////////////////////
     // Configure pairs and paths
     const pair1Id = await configurePair('DAI', 'WETH');
-    await strategyFactory.setPath(pair1Id, 
-                                  5, 
-                                  reversePairs['DAI'],
-                                  100, 
-                                  reversePairs['USDC'],
-                                  3000, 
-                                  reversePairs['WETH'],
-                                  0, 
-                                  ZER0
-    );
-    console.log("DAI-ETH pair and path set - pairId: ", pair1Id);
+    // await strategyFactory.setPath(pair1Id, 
+    //                               5, 
+    //                               reversePairs['DAI'],
+    //                               100, 
+    //                               reversePairs['USDC'],
+    //                               3000, 
+    //                               reversePairs['WETH'],
+    //                               0, 
+    //                               ZER0
+    // );
+    console.log("Set DAI-ETH pair - pairId: ", pair1Id);
 
     const pair2Id = await configurePair('WETH', 'DAI');
-    await strategyFactory.setPath(pair2Id, 
-                                  5, 
-                                  reversePairs['WETH'],
-                                  3000,
-                                  reversePairs['USDC'],
-                                  100, 
-                                  reversePairs['DAI'],
-                                  0, 
-                                  ZER0
-    );
-    console.log("ETH-DAI pair and path set - pairId: ", pair2Id);
+    // await strategyFactory.setPath(pair2Id, 
+    //                               5, 
+    //                               reversePairs['WETH'],
+    //                               3000,
+    //                               reversePairs['USDC'],
+    //                               100, 
+    //                               reversePairs['DAI'],
+    //                               0, 
+    //                               ZER0
+    // );
+    console.log("Set ETH-DAI pair - pairId: ", pair2Id);
     //
     //
     ///////////////////////////////////////////////////////////////////////////////

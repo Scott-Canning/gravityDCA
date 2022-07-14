@@ -1,6 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
 require("hardhat-gas-reporter");
+require("solidity-docgen");
 require('dotenv').config({path:__dirname+'/.env'})
 
 module.exports = {
@@ -27,7 +28,7 @@ module.exports = {
     }
   },
   etherscan: {
-    apiKey: process.env.POLYGONSCAN_KEY, //{
-      // kovan: process.env.ETHERSCAN_KEY,
+    apiKey: process.env.POLYGONSCAN_KEY,
+    // kovan: process.env.ETHERSCAN_KEY,
   },
 };
