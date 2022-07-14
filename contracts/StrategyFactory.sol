@@ -6,8 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/KeeperCompatible.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
-import '@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol';
-import '@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol';
 
 interface IUniswapV2Router {
   function getAmountsOut(uint256 amountIn, address[] memory path) external view returns (uint256[] memory amounts);
@@ -21,7 +19,7 @@ interface IUniswapV2Router {
  */
 contract StrategyFactory is Ownable {
     /// @notice [TESTING]
-    bool public localTesting = false;
+    bool public localTesting = true;
     uint public immutable upKeepInterval;
     uint public purchaseSlot;
     uint public lastTimeStamp;
@@ -35,11 +33,10 @@ contract StrategyFactory is Ownable {
     /// @notice Tracks first swap timestamp of purchase slot to maintain daily upkeep cadence
     uint public firstTimeStamp;
     
-    /// @notice [TESTING V2 -> QUICKSWAP] 
-    ISwapRouter public immutable swapRouterV3 = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    /// @notice V2 swap router
     IUniswapV2Router public immutable swapRouterV2 = IUniswapV2Router(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff);
 
-    /// @notice Oracle pricefeed
+    /// @notice Oracle price feed
     AggregatorV3Interface internal priceFeed;
 
     /**
@@ -98,7 +95,6 @@ contract StrategyFactory is Ownable {
     struct Pair {
         address         fromToken;
         address         toToken;
-        bytes           path;
     }
 
     event StrategyInitiated(address account, uint nextPurchaseSlot);
@@ -110,7 +106,7 @@ contract StrategyFactory is Ownable {
     constructor(uint _upKeepInterval) {
         upKeepInterval = _upKeepInterval;
         lastTimeStamp = block.timestamp;
-        reversePairs.push(Pair(address(0), address(0), ""));
+        reversePairs.push(Pair(address(0), address(0)));
     }
 
     /**
@@ -131,6 +127,118 @@ contract StrategyFactory is Ownable {
      */
     function getPurchaseOrderDetails(uint slot, uint pairId) public view returns (PurchaseOrder[] memory) {
         return purchaseOrders[slot][pairId];
+    }
+
+    /**
+     * @notice Enables new strategy pairing
+     * @param fromToken Token that funds _toToken purchase
+     * @param toToken Token that gets purchased with _fromToken
+     */
+    function setPair(address fromToken, address toToken) external onlyOwner {
+        require(pairs[fromToken][toToken] == 0, "Pair exists");
+        uint _pairId = reversePairs.length;
+        pairs[fromToken][toToken] = _pairId;
+        reversePairs.push(Pair(fromToken, toToken));
+    }
+
+    /**
+     * @notice 'pairId' getter
+     * @param fromToken Token address that funds _toToken purchase
+     * @param toToken Token address that gets purchased with _fromToken
+     */
+    function getPairId(address fromToken, address toToken) public view returns (uint) {
+        return pairs[fromToken][toToken];
+    }
+
+    /**
+     * @notice Pair's addresses getter
+     * @param pairId pairId of the pair's addresses being sought
+     * @return fromToken and toToken addresses tuple associated with the passed pairId
+     */
+    function getPairAddresses(uint pairId) public view returns (address, address) {
+        return(reversePairs[pairId].fromToken, reversePairs[pairId].toToken);
+    }
+
+    /**
+     * @notice Handles removable of existing pair
+     * note:
+     * - Should only be executed if no live strategies exist for either pair
+     * - Deletes pair from 'pairs' mapping
+     * - Swaps last pair in 'reversePairs' into index of pair being removed
+     * - Points 'pairs' mapping for last pair to new pairId
+     * @param fromToken Source token address of pair being removed
+     * @param toToken Target token address of pair being removed
+     */
+    function removePair(address fromToken, address toToken) external onlyOwner {
+        require(pairs[fromToken][toToken] > 0, "Pair does not exist");
+        uint _pairId = pairs[fromToken][toToken];
+        delete pairs[fromToken][toToken];
+        uint _lastPairIdx = reversePairs.length - 1;
+        reversePairs[_pairId] = reversePairs[_lastPairIdx];
+        reversePairs.pop();
+        (address _from, address _to) = getPairAddresses(_pairId);
+        pairs[_from][_to] = _pairId;
+    }
+
+    /**
+     * @notice Allows owner to set protocol fee
+     * @param _fee Fee value in decimal representation of percent, 0.XX * 10e18
+     */
+    function setFee(uint _fee) external onlyOwner {
+        fee = _fee;
+    }
+
+    /**
+     * @notice Incurs fee on balance
+     * @param balance Balance on which a fee is to be incurred
+     * @return The passed balance less the fee incurred
+     */
+    function incurFee(address sourceAsset, uint balance) internal returns (uint) {
+        uint _feeIncurred = balance * fee / 100e18;
+        treasury[sourceAsset] += _feeIncurred;
+        return balance - _feeIncurred;
+    }
+
+    /**
+     * @notice Allows owner to set price feed addresses for each token
+     * @param token Address of token price feed is being set for
+     * @param feed Address of price feed for token
+     */
+    function setPriceFeed(address token, address feed) external onlyOwner {
+        priceFeeds[token] = feed;
+    }
+
+    /**
+     * @notice Price fee getter
+     * @param token Address of token price feed address is being sought for
+     * @return Price feed address for token
+     */
+    function getPriceFeed(address token) public view returns (address) {
+        return priceFeeds[token];
+    }
+
+    /**
+     * @notice Max slippage setter
+     * @param _slippageFactor New slippage factor value
+     */
+    function setSlippageFactor(uint _slippageFactor) external onlyOwner {
+         slippageFactor = _slippageFactor;
+    }
+
+    /**
+     * @notice Min purchase amount setter
+     * @param _minPurchaseAmount New min purchase amount value
+     */
+    function setMinPurchaseAmount(uint _minPurchaseAmount) external onlyOwner {
+         minPurchaseAmount = _minPurchaseAmount;
+    }
+
+    /**
+     * @notice Treasury mapping getter by source asset
+     * @return Treasury balance of source asset
+     */
+    function getTreasury(address sourceAsset) public view returns (uint) {
+        return treasury[sourceAsset];
     }
 
     /**
@@ -158,7 +266,7 @@ contract StrategyFactory is Ownable {
      */
     function initiateNewStrategy(address sourceAsset, address targetAsset, uint sourceBalance, uint interval, uint purchaseAmount) public {
         uint _pairId = pairs[sourceAsset][targetAsset];
-        require(_pairId > 0, "Pair does not exist");
+        require(_pairId > 0 && _pairId < reversePairs.length, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy");
         require(interval == 1 || interval == 7 || interval == 14 || interval == 21 || interval == 30, "Unsupported interval");
         depositSource(sourceAsset, sourceBalance);
@@ -321,173 +429,13 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice Enables new strategy pairing
-     * @param fromToken Token that funds _toToken purchase
-     * @param toToken Token that gets purchased with _fromToken
+     * @notice Swap function
+     * @param tokenIn Source token funding swap
+     * @param tokenOut Target target received from swap
+     * @param amountIn Amount of source token to be swapped
+     * @return amountOut Amount of target token received after swap
      */
-    function setPair(address fromToken, address toToken) external onlyOwner {
-        require(pairs[fromToken][toToken] == 0, "Pair exists");
-        uint _pairId = reversePairs.length;
-        pairs[fromToken][toToken] = _pairId;
-        reversePairs.push(Pair(fromToken, toToken, ""));
-    }
-
-    /**
-     * @notice 'pairId' getter
-     * @param fromToken Token address that funds _toToken purchase
-     * @param toToken Token address that gets purchased with _fromToken
-     */
-    function getPairId(address fromToken, address toToken) public view returns (uint) {
-        return pairs[fromToken][toToken];
-    }
-
-    /**
-     * @notice Pair's addresses getter
-     * @param pairId pairId of the pair's addresses being sought
-     * @return fromToken and toToken addresses tuple associated with the passed pairId
-     */
-    function getPairAddresses(uint pairId) public view returns (address, address) {
-        return(reversePairs[pairId].fromToken, reversePairs[pairId].toToken);
-    }
-
-    /**
-     * @notice Handles removable of existing pair
-     * note:
-     * - Should only be executed if no live strategies exist for either pair
-     * - Deletes pair from 'pairs' mapping
-     * - Swaps last pair in 'reversePairs' into index of pair being removed
-     * - Points 'pairs' mapping for last pair to new pairId
-     * @param fromToken Source token address of pair being removed
-     * @param toToken Target token address of pair being removed
-     */
-    function removePair(address fromToken, address toToken) external onlyOwner {
-        require(pairs[fromToken][toToken] > 0, "Pair does not exist");
-        uint _pairId = pairs[fromToken][toToken];
-        delete pairs[fromToken][toToken];
-        uint _lastPairIdx = reversePairs.length - 1;
-        reversePairs[_pairId] = reversePairs[_lastPairIdx];
-        reversePairs.pop();
-        (address _from, address _to) = getPairAddresses(_pairId);
-        pairs[_from][_to] = _pairId;
-    }
-
-    /**
-     * @notice Sets pair pool path for V3 swapping [TESTING]
-     * NOTE in production would be only owner
-     */
-    function setPath(uint24 pairId, uint24 params,
-                     address assetA, uint24 fee1, 
-                     address assetB, uint24 fee2, 
-                     address assetC, uint24 fee3, 
-                     address assetD)
-                     external onlyOwner {
-        if(params == 3) {
-            reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB);
-        } else if(params == 5) {
-            reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB, fee2, assetC);
-        } else if (params == 7) {
-            reversePairs[pairId].path = abi.encodePacked(assetA, fee1, assetB, fee2, assetC, fee3, assetD);
-        }
-    }
-
-    /**
-     * @notice Get pair pool path
-     * @param pairId pairId of pair path being sought
-     * @return Path
-     */
-    function getPath(uint pairId) public view returns (bytes memory) {
-        return reversePairs[pairId].path;
-    }
-
-    /**
-     * @notice Allows owner to set protocol fee
-     * @param _fee Fee value in decimal representation of percent, 0.XX * 10e18
-     */
-    function setFee(uint _fee) external onlyOwner {
-        fee = _fee;
-    }
-
-    /**
-     * @notice Incurs fee on balance
-     * @param balance Balance on which a fee is to be incurred
-     * @return The passed balance less the fee incurred
-     */
-    function incurFee(address sourceAsset, uint balance) internal returns (uint) {
-        uint _feeIncurred = balance * fee / 100e18;
-        treasury[sourceAsset] += _feeIncurred;
-        return balance - _feeIncurred;
-    }
-
-    /**
-     * @notice Allows owner to set price feed addresses for each token
-     * @param token Address of token price feed is being set for
-     * @param feed Address of price feed for token
-     */
-    function setPriceFeed(address token, address feed) external onlyOwner {
-        priceFeeds[token] = feed;
-    }
-
-    /**
-     * @notice Price fee getter
-     * @param token Address of token price feed address is being sought for
-     * @return Price feed address for token
-     */
-    function getPriceFeed(address token) public view returns (address) {
-        return priceFeeds[token];
-    }
-
-    /**
-     * @notice Max slippage setter
-     * @param _slippageFactor New slippage factor value
-     */
-    function setSlippageFactor(uint _slippageFactor) external onlyOwner {
-         slippageFactor = _slippageFactor;
-    }
-
-    /**
-     * @notice Min purchase amount setter
-     * @param _minPurchaseAmount New min purchase amount value
-     */
-    function setMinPurchaseAmount(uint _minPurchaseAmount) external onlyOwner {
-         minPurchaseAmount = _minPurchaseAmount;
-    }
-
-    /**
-     * @notice Treasury mapping getter by source asset
-     * @return Treasury balance of source asset
-     */
-    function getTreasury(address sourceAsset) public view returns (uint) {
-        return treasury[sourceAsset];
-    }
-
-    /////////////////////////////////////////////////////
-    ////////////////////// TESTING //////////////////////
-    ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
-
-    /**
-     * NOTE: [TESTING]
-     */
-    function swapV3(uint pairId, address tokenIn, address tokenOut, uint256 amountIn) internal returns (uint256 amountOut) {
-        TransferHelper.safeApprove(tokenIn, address(swapRouterV3), amountIn);
-        int _tokenInPrice = getLatestPrice(tokenIn);
-        int _tokenOutPrice = getLatestPrice(tokenOut);
-        uint amountOutMin = ((amountIn * uint(_tokenInPrice)) / uint(_tokenOutPrice) * slippageFactor) / 100;
-
-        ISwapRouter.ExactInputParams memory params =
-            ISwapRouter.ExactInputParams({
-                path: reversePairs[pairId].path,
-                recipient: address(this),
-                deadline: block.timestamp,
-                amountIn: amountIn,
-                amountOutMinimum: amountOutMin
-            });
-        amountOut = swapRouterV3.exactInput(params);
-    }
-
-    /**
-     * NOTE: [TESTING] V2 ROUTER FOR QUICKSWAP
-     */
-    function swapV2(address tokenIn, address tokenOut, uint256 amountIn) internal returns (uint256 amountOut) {      
+    function swap(address tokenIn, address tokenOut, uint256 amountIn) internal returns (uint256 amountOut) {      
         IERC20(tokenIn).approve(address(swapRouterV2), amountIn);
         int _tokenInPrice = getLatestPrice(tokenIn);
         int _tokenOutPrice = getLatestPrice(tokenOut);
@@ -511,9 +459,10 @@ contract StrategyFactory is Ownable {
 
     /**
      * @notice Chainlink oracle price feed
-     * @return the latest price and decimal for the passed token address
+     * @param token The address of the token a price is being sought for
+     * @return price The latest price for the passed token address
      */
-    function getLatestPrice(address token) public view returns (int) {
+    function getLatestPrice(address token) public view returns (int price) {
         address _token = priceFeeds[token];
         (
             uint80 roundID, 
@@ -526,12 +475,17 @@ contract StrategyFactory is Ownable {
         return price;
     }
 
-    /// @notice [TESTING] placeholder oracle prices for local swap testing
+    /////////////////////////////////////////////////////
+    ////////////////////// TESTING //////////////////////
+    ////////////// MOCK KEEPERS FUNCTIONS ///////////////
+
+    /// @notice [TESTING] mock oracle prices for local swap testing
     uint[] public AssetPrices = [0, 2000, 30000, 1]; // null, ETH, BTC, MATIC
 
 
     /// @notice [TESTING] checkUpkeep keeper integration placeholder function for testing purposes
     function checkUpkeepTEST(uint _pairId /* bytes calldata checkData */) external  {
+        require(_pairId > 0 && _pairId < reversePairs.length, "Pair does not exist");
         if((block.timestamp - lastTimeStamp) > upKeepInterval){
             uint _purchaseAmount = accumulatePurchaseOrders(purchaseSlot, _pairId);
             performUpkeepTEST(_pairId, _purchaseAmount);
@@ -548,6 +502,7 @@ contract StrategyFactory is Ownable {
 
     /// @notice [TESTING] performUpkeep keeper integration placeholder function for testing purposes
     function performUpkeepTEST(uint _pairId, uint _purchaseAmount) internal {
+        require(_pairId > 0 && _pairId < reversePairs.length, "Pair does not exist");
         if ((block.timestamp - lastTimeStamp) > upKeepInterval) {
             if(swapIndex == 1) {
                 firstTimeStamp = block.timestamp;
@@ -559,28 +514,17 @@ contract StrategyFactory is Ownable {
             /////////////////////////////////////////////////////
             uint _purchased;
             if(_purchaseAmount > 0) {
-
                 /////////////////////////////////////////////////////
                 ////////////////////// TESTING //////////////////////
-                if(localTesting) {
-                    // [SIMULATED LOCAL SWAP]
+                if(localTesting) { // [SIMULATED LOCAL SWAP]
                    _purchased += _purchaseAmount / AssetPrices[_pairId];
-                // } else {
-                //     // [FORKED MAINNET V3 SWAP]
-                //     _purchased = swapV3(_pairId,
-                //                       reversePairs[_pairId].fromToken,
-                //                       reversePairs[_pairId].toToken,
-                //                       _purchaseAmount);
-                // }
-                } else {
-                    // [FORKED MAINNET V2 SWAP]
-                    _purchased = swapV2(reversePairs[_pairId].fromToken,
-                                        reversePairs[_pairId].toToken,
-                                        _purchaseAmount);
+                } else {           // [FORKED MAINNET V2 SWAP]
+                    _purchased = swap(reversePairs[_pairId].fromToken,
+                                      reversePairs[_pairId].toToken,
+                                      _purchaseAmount);
                 }
                 ////////////////////// TESTING //////////////////////
                 /////////////////////////////////////////////////////                    
-            
                 uint _purchaseSlot = purchaseSlot;
                 for(uint i = 0; i < purchaseOrders[_purchaseSlot][_pairId].length; i++) {
                     address _user = purchaseOrders[_purchaseSlot][_pairId][i].user;
@@ -604,13 +548,13 @@ contract StrategyFactory is Ownable {
         }
     }
 
-    ///////// PLACEHOLDER KEEPERS & SWAP FUNCTIONS //////
+    ////////////// MOCK KEEPERS FUNCTIONS ///////////////
     ////////////////////// TESTING //////////////////////
     /////////////////////////////////////////////////////
-
+    
     receive() payable external {}
 
     /**
-    * Built in the depths of the bear market of 2022. Keep building friends.
+    * Built in the depths of the 2022 bear market. Keep building friends.
     */
 }

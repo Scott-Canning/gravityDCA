@@ -1,9 +1,10 @@
-// StrategyFactory_Kovan_deploy.js
+// StrategyFactory_deploy.js
 const hre = require("hardhat");
 const { ethers } = require('ethers');
 require('dotenv').config();
 
-const upKeepInterval = 120;
+const upKeepIntervalPROD = 60 * 60 * 24; // 1 day
+const upKeepIntervalTEST = 120; // 120 seconds
 
 async function deploy() {
   const url = process.env.MUMBAI_URL;
@@ -14,7 +15,7 @@ async function deploy() {
 
   let artifacts = await hre.artifacts.readArtifact("StrategyFactory");
   let factory = new ethers.ContractFactory(artifacts.abi, artifacts.bytecode, wallet);
-  let contract = await factory.deploy(upKeepInterval);
+  let contract = await factory.deploy(upKeepIntervalTEST);
 
   console.log("Contract address:", contract.address);
   await contract.deployed();

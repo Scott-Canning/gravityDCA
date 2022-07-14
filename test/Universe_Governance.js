@@ -202,124 +202,6 @@ describe("Governance", function () {
                                       .revertedWith("Governor: proposer votes below proposal threshold");
     });
 
-    it("Attempt to setPath for pair by non-owner should revert", async function () {
-        const pairId = 1;
-        await expect(strategyFactory.setPath(pairId, 
-                                             5, 
-                                             '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-                                             100, 
-                                             '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
-                                             3000, 
-                                             '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
-                                             0, 
-                                             '0x0000000000000000000000000000000000000000'
-                                             ))
-                                             .to.be
-                                             .revertedWith( "Ownable: caller is not the owner");
-    });
-
-    it("Proposal to setPath by governor with sufficient votes should successfully execute", async function () {
-        // Signer 2 transfers back governance tokens, falling below 10,000 proposal threshold
-        const transfer = ethers.utils.parseUnits("9999000", 18);
-        await gravToken.connect(signer2).transfer(signer1.address, transfer);
-        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address })
-
-        const contractAddress = strategyFactory.address;
-        const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
-        const id = 1;
-        const params = 5;
-        const fromToken = sourceToken.address;
-        const fee1 = 100;
-        const interToken = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
-        const fee2 = 3000;
-        const toToken = targetToken.address;
-        const fillFee = 0;
-        const fillToken = '0x0000000000000000000000000000000000000000';
-        const calldata = contract.interface.encodeFunctionData("setPath", [id, 
-                                                                           params, 
-                                                                           fromToken,
-                                                                           fee1, 
-                                                                           interToken,
-                                                                           fee2, 
-                                                                           toToken,
-                                                                           fillFee, 
-                                                                           fillToken
-                                                                           ]);
-
-        // Propose transaction
-        const proposeTx = await governor.propose([contractAddress],
-                                                 [0],
-                                                 [calldata],
-                                                 "Proposal #1: Set pair path",
-                                                 {gasLimit: 850_000});
-        const proposeReceipt = await proposeTx.wait(1);
-        const proposalId = proposeReceipt.events[0].args.proposalId;
-
-        // Advance time forward 'votingDelay' blocks to open voting period
-        let endTimestamp = timestamp + ((votingDelay + 2) * blocktime)
-        while(timestamp <= endTimestamp) {
-            await ethers.provider.send('evm_increaseTime', [blocktime]);
-            await ethers.provider.send('evm_mine');
-            timestamp = await getBlockTimestamp();
-        }
-
-        // Signer 1 votes
-        const voteTx = await governor.connect(signer1).castVote(proposalId, 1);
-        
-        // Assert state
-        let state = await governor.state(proposalId);
-        assert.equal(propState[state], "Active");
-
-        // Advance time forward 'votingPeriod' blocks (-1 on castVote block increment)
-        endTimestamp = timestamp + (votingPeriod * blocktime);
-        while(timestamp < endTimestamp) {
-            await ethers.provider.send('evm_increaseTime', [blocktime]);
-            await ethers.provider.send('evm_mine');
-            timestamp = await getBlockTimestamp();
-        }
-
-        // Assert state
-        state = await governor.state(proposalId);
-        assert.equal(propState[state], "Succeeded");
-
-        // Queue proposal in timelock
-        const descriptionHash = ethers.utils.id("Proposal #1: Set pair path");
-        const queueTx = await governor.queue([contractAddress], [0], [calldata], descriptionHash);
-
-        // Assert state
-        state = await governor.state(proposalId);
-        assert.equal(propState[state], "Queued");
-
-        // Advance block forward 'timelockBlocks'
-        endTimestamp = timestamp + (blocktime * timelockBlocks);
-        while(timestamp <= endTimestamp) {
-            await ethers.provider.send('evm_increaseTime', [blocktime]);
-            await ethers.provider.send('evm_mine');
-            timestamp = await getBlockTimestamp();
-        }
-
-        // Execute proposal
-        const executeTx = await governor.execute([contractAddress], [0], [calldata], descriptionHash);
-
-        // Assert state
-        state = await governor.state(proposalId);
-        assert.equal(propState[state], "Executed");
-
-        let path = await strategyFactory.getPath(id);
-        path = path.substring(2);
-        const a1 = path.slice(0,40);
-        const f1 = path.slice(40,46);
-        const a2 = path.slice(46,86);
-        const f2 = path.slice(86,92);
-        const a3 = path.slice(92,132);
-
-        assert.equal(a1.toLowerCase(), (fromToken.substring(2)).toLowerCase());
-        assert.equal(parseInt(f1, 16), fee1);
-        assert.equal(a2.toLowerCase(), (interToken.substring(2)).toLowerCase());
-        assert.equal(parseInt(f2, 16), fee2);
-        assert.equal(a3.toLowerCase(), (toToken.substring(2)).toLowerCase());
-    });
-
     it("Attempt to setPriceFeed by non-owner should revert", async function () {
         await expect(strategyFactory.setPriceFeed('0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063', 
                                                   '0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D'))
@@ -330,8 +212,9 @@ describe("Governance", function () {
 
     it("Proposal to setPriceFeed by governor with sufficient votes should successfully execute", async function () {
         // Signer 2 transfers back governance tokens, falling below 10,000 proposal threshold
-        // const transfer = ethers.utils.parseUnits("9999000", 18);
-        // await gravToken.connect(signer2).transfer(signer1.address, transfer);
+        const transfer = ethers.utils.parseUnits("9999000", 18);
+        await gravToken.connect(signer2).transfer(signer1.address, transfer);
+        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address })
         
         await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address })
         const contractAddress = strategyFactory.address;
