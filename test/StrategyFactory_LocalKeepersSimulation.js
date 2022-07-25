@@ -3,7 +3,7 @@ const { ethers } = require("hardhat");
 //const { hrtime } = require("process");
 
 
-describe("Local Upkeep Simulation", function () {
+describe("StrategyFactory.sol: Local Upkeep Simulation", function () {
     const pairs = {}; // note: imperfect representation of nested map 'pairs' in StrategyFactory.sol (non-DCE)
     const reversePairs = [];
     const upKeepInterval = 120;

@@ -2,7 +2,7 @@ const { assert, expect } = require("chai");
 const { ethers } = require("hardhat");
 
 
-describe("topUpStrategy()", function () {
+describe("StrategyFactory.sol: topUpStrategy()", function () {
     const pairs = {}; // note: imperfect representation of nested map 'pairs' in StrategyFactory.sol (non-DCE)
     const reversePairs = []; // 
     const upKeepInterval = 120;

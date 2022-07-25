@@ -2,7 +2,7 @@ const { assert, expect } = require("chai");
 const { ethers } = require("hardhat");
 
 
-describe("initNewStrategy()", function () {
+describe("StrategyFactory.sol: initNewStrategy()", function () {
     const pairs = {}; // note: imperfect representation of nested map 'pairs' in StrategyFactory.sol (non-DCE)
     const upKeepInterval = 120;
     // Signer 1 configuration inputs

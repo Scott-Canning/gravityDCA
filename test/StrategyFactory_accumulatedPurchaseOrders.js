@@ -2,7 +2,7 @@ const { assert } = require("chai");
 const { ethers } = require("hardhat");
 
 
-describe("accumulatePurchaseOrders()", function () {
+describe("StrategyFactory.sol: accumulatePurchaseOrders()", function () {
     const pairs = {}; // note: imperfect representation of nested map 'pairs' in StrategyFactory.sol (non-DCE)
     const reversePairs = [];
     const upKeepInterval = 120;

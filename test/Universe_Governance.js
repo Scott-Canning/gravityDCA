@@ -8,7 +8,7 @@ async function getBlockTimestamp() {
     return block.timestamp;
 }
 
-describe("Governance", function () {
+describe("Universe.sol: Governance", function () {
     const upKeepInterval = 120;
     const blocktime = 14;
     const timelockBlocks = 5;
@@ -16,7 +16,7 @@ describe("Governance", function () {
 
     let sourceToken, targetToken, strategyFactory, gravToken, 
         timelock, governor, signer1, signer2, votingDelay, votingPeriod,
-        blockNum, block, timestamp;
+        blockNum, block, timestamp, linkToken;
 
     let propState = [
         "Pending",
@@ -27,7 +27,7 @@ describe("Governance", function () {
         "Queued",
         "Expired",
         "Executed"
-        ]
+        ];
 
     before("Deploy governance contracts, core contracts, and testing tokens", async function () { 
         blockNum = await ethers.provider.getBlockNumber();
@@ -47,6 +47,11 @@ describe("Governance", function () {
         targetToken = await TargetToken.deploy();
         await targetToken.deployed();
 
+        // Deploy ERC20 LINK token
+        const LinkToken = await ethers.getContractFactory("TargetToken");
+        linkToken = await LinkToken.deploy();
+        await linkToken.deployed();
+
         // Deploy Strategy Factory contract
         const StrategyFactory = await ethers.getContractFactory("StrategyFactory");
         strategyFactory = await StrategyFactory.deploy(upKeepInterval);
@@ -58,7 +63,7 @@ describe("Governance", function () {
         await gravToken.deployed();
         
         // Deploy timelock contract
-        const Timelock = await ethers.getContractFactory("@openzeppelin/contracts/governance/TimelockController.sol:TimelockController");
+        const Timelock = await ethers.getContractFactory("contracts/TimelockController.sol:TimelockController");
         timelock = await Timelock.deploy(minDelay, [], []);
         await timelock.deployed();
 
@@ -104,14 +109,14 @@ describe("Governance", function () {
 
     it("Attempts to set new pairs by non-owner should revert", async function () {
         await expect(strategyFactory.setPair(sourceToken.address, targetToken.address))
-                            .to.be.revertedWith( "Ownable: caller is not the owner");
+                            .to.be.revertedWith("Ownable: caller is not the owner");
 
         await expect(strategyFactory.setPair(targetToken.address, sourceToken.address))
-                            .to.be.revertedWith( "Ownable: caller is not the owner");
+                            .to.be.revertedWith("Ownable: caller is not the owner");
     });
 
     it("Proposal to setPair by governor with sufficient votes should successfully execute", async function () {
-        await gravToken.delegate(signer1.address, { from: signer1.address })
+        await gravToken.delegate(signer1.address, { from: signer1.address });
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const sourceTokenAddress = sourceToken.address;
@@ -185,8 +190,8 @@ describe("Governance", function () {
         // Signer 1 transfers governance tokens, falling below 10,000 proposal threshold
         const transfer = ethers.utils.parseUnits("9999000", 18);
         await gravToken.transfer(signer2.address, transfer);
-        
-        await gravToken.delegate(signer1.address, { from: signer1.address })
+        await gravToken.delegate(signer1.address, { from: signer1.address });
+
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const sourceTokenAddress = targetToken.address;
@@ -206,7 +211,7 @@ describe("Governance", function () {
         await expect(strategyFactory.setPriceFeed('0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063', 
                                                   '0x4746DeC9e833A82EC7C2C1356372CcF2cfcD2F3D'))
                                                   .to.be
-                                                  .revertedWith( "Ownable: caller is not the owner");
+                                                  .revertedWith("Ownable: caller is not the owner");
 
     });
 
@@ -214,9 +219,7 @@ describe("Governance", function () {
         // Signer 2 transfers back governance tokens, falling below 10,000 proposal threshold
         const transfer = ethers.utils.parseUnits("9999000", 18);
         await gravToken.connect(signer2).transfer(signer1.address, transfer);
-        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address })
-        
-        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address })
+        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address });
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const targetTokenAddress = targetToken.address;
@@ -290,11 +293,11 @@ describe("Governance", function () {
         const minPurchaseAmount = ethers.utils.parseUnits("1000", 18);
         await expect(strategyFactory.setMinPurchaseAmount(minPurchaseAmount))
                                                           .to.be
-                                                          .revertedWith( "Ownable: caller is not the owner");
+                                                          .revertedWith("Ownable: caller is not the owner");
     });
 
     it("Proposal to update minPurchaseAmount by governor with sufficient votes should successfully execute", async function () {       
-        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address })
+        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address });
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const minPurchaseAmount = 50;
@@ -366,11 +369,11 @@ describe("Governance", function () {
     it("Attempt to update slippageFactor by non-owner should revert", async function () {
         await expect(strategyFactory.setSlippageFactor(98))
                                                     .to.be
-                                                    .revertedWith( "Ownable: caller is not the owner");
+                                                    .revertedWith("Ownable: caller is not the owner");
     });
 
     it("Proposal to update slippageFactor by governor with sufficient votes should successfully execute", async function () {       
-        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address })
+        await gravToken.connect(signer1).delegate(signer1.address, { from: signer1.address });
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
         const slippageFactor = 98;
@@ -438,6 +441,5 @@ describe("Governance", function () {
         let _maxDiscount = await strategyFactory.slippageFactor();
         assert.equal(slippageFactor, _maxDiscount);
     });
-
 
 });
