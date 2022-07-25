@@ -54,8 +54,6 @@ async function main() {
         let block = await ethers.provider.getBlock(blockNum);
         let timestamp = block.timestamp;
         let endTimestamp = timestamp + ((((strategy.deposit / strategy.purchaseAmount) * 3) * strategy.interval) * upKeepInterval);
-        console.log("timestamp:                     ", timestamp);
-        console.log("(endTimestamp - timestamp) / upKeepInterval: ", (endTimestamp - timestamp) / upKeepInterval);
         let purchaseSlot = 0; 
         while(timestamp <= endTimestamp) {
             await strategyFactory.checkUpkeepTEST(strategy.pairId, {gasLimit: 1_000_000});
@@ -172,29 +170,9 @@ async function main() {
     ////////////////////////////////////////////////////////////////////////////////
     // Configure pairs and paths
     const pair1Id = await configurePair('DAI', 'WETH');
-    // await strategyFactory.setPath(pair1Id, 
-    //                               5, 
-    //                               reversePairs['DAI'],
-    //                               100, 
-    //                               reversePairs['USDC'],
-    //                               3000, 
-    //                               reversePairs['WETH'],
-    //                               0, 
-    //                               ZER0
-    // );
     console.log("Set DAI-ETH pair - pairId: ", pair1Id);
 
     const pair2Id = await configurePair('WETH', 'DAI');
-    // await strategyFactory.setPath(pair2Id, 
-    //                               5, 
-    //                               reversePairs['WETH'],
-    //                               3000,
-    //                               reversePairs['USDC'],
-    //                               100, 
-    //                               reversePairs['DAI'],
-    //                               0, 
-    //                               ZER0
-    // );
     console.log("Set ETH-DAI pair - pairId: ", pair2Id);
     //
     //

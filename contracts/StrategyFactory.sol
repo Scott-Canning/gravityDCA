@@ -234,14 +234,6 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice Treasury mapping getter by source asset
-     * @return Treasury balance of source asset
-     */
-    function getTreasury(address sourceAsset) public view returns (uint) {
-        return treasury[sourceAsset];
-    }
-
-    /**
      * @notice Sums a purchase slot's purchase order for pairId and returns result
      * @param slot The purchase slot accumulated purchase amounts are being sought for
      * @param pairId The pairId accumulated purchase amounts are being sought for
@@ -410,7 +402,7 @@ contract StrategyFactory is Ownable {
     }
 
     /**
-     * @notice Allows users to withdrawal target asset
+     * @notice Allows users to withdraw target asset
      * @param pairId pairId of the strategy user is withdrawing the target asset from
      * @param amount Amount of the target asset the user is withdrawing
      * note:
@@ -426,6 +418,22 @@ contract StrategyFactory is Ownable {
             delete accounts[msg.sender][pairId];
         }
         emit Withdrawal(msg.sender, amount);
+    }
+
+    /**
+     * @notice Treasury mapping getter by source asset
+     * @return Treasury balance of source asset
+     */
+    function getTreasury(address sourceAsset) public view returns (uint) {
+        return treasury[sourceAsset];
+    }
+
+    /// @notice [TESTING] Allows governing contract to withdraw treasury assets
+    function withdrawTreasury(address token, uint amount) external onlyOwner {
+        require(treasury[token] >= amount, "Amount exceeds balance");
+        treasury[token] -= amount;
+        (bool success) = IERC20(token).transfer(msg.sender, amount);
+        require(success, "Withdrawal unsuccessful");
     }
 
     /**
@@ -551,7 +559,7 @@ contract StrategyFactory is Ownable {
     ////////////// MOCK KEEPERS FUNCTIONS ///////////////
     ////////////////////// TESTING //////////////////////
     /////////////////////////////////////////////////////
-    
+
     receive() payable external {}
 
     /**
