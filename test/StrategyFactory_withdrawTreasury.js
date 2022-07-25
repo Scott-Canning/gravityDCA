@@ -36,7 +36,7 @@ describe("StrategyFactory.sol: withdrawTreasury()", function () {
         "Executed"
         ];
 
-    before("Deploy governance contracts, core contracts, and testing tokens", async function () { 
+    beforeEach("Deploy governance contracts, core contracts, and testing tokens", async function () { 
         blockNum = await ethers.provider.getBlockNumber();
         block = await ethers.provider.getBlock(blockNum);
         timestamp = block.timestamp;
@@ -143,11 +143,11 @@ describe("StrategyFactory.sol: withdrawTreasury()", function () {
                             .to.be.revertedWith("Ownable: caller is not the owner");
     });
 
-    it("Proposal to withdraw treasury into timelock should successfully execute", async function () {
+    it("Proposal to withdraw amount equal to treasury balance into timelock contract should successfully execute", async function () {
         await gravToken.delegate(signer1.address, { from: signer1.address });
         const contractAddress = strategyFactory.address;
         const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
-        const treasuryBalance = parseFloat(ethers.utils.formatUnits(await strategyFactory.getTreasury(sourceToken.address), 18));
+        const treasuryBalance = await strategyFactory.getTreasury(sourceToken.address);
         const calldata = contract.interface.encodeFunctionData("withdrawTreasury", [sourceToken.address, treasuryBalance]);
 
         // Propose transaction
@@ -209,8 +209,75 @@ describe("StrategyFactory.sol: withdrawTreasury()", function () {
         state = await governor.state(proposalId_SetFee);
         assert.equal(propState[state], "Executed");
 
-        const timelockBalance = ethers.BigNumber.from(await sourceToken.balanceOf(timelock.address)).toNumber();
-        assert.equal(treasuryBalance, timelockBalance);
+        const timelockBalance = parseFloat(ethers.utils.formatUnits(await sourceToken.balanceOf(timelock.address), 18));
+        const treasuryBalanceFormatted = parseFloat(ethers.utils.formatUnits(treasuryBalance, 18));
+        assert.equal(treasuryBalanceFormatted, timelockBalance);
+    });
+
+    it("Proposal to withdraw amount exceeding treasury balance into timelock contract should successfully execute", async function () {
+        await gravToken.delegate(signer1.address, { from: signer1.address });
+        const contractAddress = strategyFactory.address;
+        const contract = await ethers.getContractAt('StrategyFactory', contractAddress);
+        const exceed = 1;
+        const treasuryBalanceExceeded = parseFloat(ethers.utils.formatUnits(await strategyFactory.getTreasury(sourceToken.address), 18)) + exceed;
+        const treasuryBalanceExceededBigNum = ethers.utils.parseUnits(treasuryBalanceExceeded.toString(), 18);
+        const calldata = contract.interface.encodeFunctionData("withdrawTreasury", [sourceToken.address, treasuryBalanceExceededBigNum]);
+
+        // Propose transaction
+        const proposeTx = await governor.propose([contractAddress],
+                                                 [0],
+                                                 [calldata],
+                                                 "Proposal #1: Withdraw treasury",
+                                                );
+        const proposeReceipt = await proposeTx.wait(1);
+        const proposalId_SetFee = proposeReceipt.events[0].args.proposalId;
+
+        // Advance time forward 'votingDelay' blocks to open voting period
+        let endTimestamp = timestamp + ((votingDelay + 1) * blocktime)
+        while(timestamp <= endTimestamp) {
+            await ethers.provider.send('evm_increaseTime', [blocktime]);
+            await ethers.provider.send('evm_mine');
+            timestamp = await getBlockTimestamp();
+        }
+
+        // Signer 1 votes
+        let voteTx = await governor.connect(signer1).castVote(proposalId_SetFee, 1);
+        
+        // Assert state
+        let state = await governor.state(proposalId_SetFee);
+        assert.equal(propState[state], "Active");
+
+        // Advance time forward 'votingPeriod' blocks
+        endTimestamp = timestamp + (votingPeriod * blocktime);
+        while(timestamp < endTimestamp) {
+            await ethers.provider.send('evm_increaseTime', [blocktime]);
+            await ethers.provider.send('evm_mine');
+            timestamp = await getBlockTimestamp();
+        }
+
+        // Assert state
+        state = await governor.state(proposalId_SetFee);
+        assert.equal(propState[state], "Succeeded");
+
+        // Queue proposal in timelock
+        const descriptionHash = ethers.utils.id("Proposal #1: Withdraw treasury");
+        const queueTx = await governor.queue([contractAddress], [0], [calldata], descriptionHash,);
+
+        // Assert state
+        state = await governor.state(proposalId_SetFee);
+        assert.equal(propState[state], "Queued");
+
+        // Advance block forward 'timelockBlocks'
+        endTimestamp = timestamp + (blocktime * timelockBlocks);
+        while(timestamp <= endTimestamp) {
+            await ethers.provider.send('evm_increaseTime', [blocktime]);
+            await ethers.provider.send('evm_mine');
+            timestamp = await getBlockTimestamp();
+        }
+
+        // Execute proposal
+        await expect(governor.execute([contractAddress], [0], [calldata], descriptionHash,))
+                        .to.be.revertedWith("TimelockController: underlying transaction reverted");
     });
 
 });
