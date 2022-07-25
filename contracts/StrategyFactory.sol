@@ -18,20 +18,32 @@ interface IUniswapV2Router {
  * withdrawal.
  */
 contract StrategyFactory is Ownable {
-    /// @notice [TESTING]
+    /// @notice [TESTING] boolean for conditional checks on testing environment
     bool public localTesting = true;
+
+    /// @notice Time delta that must be satisfied for checkUpkeep to evaluate true (60 * 60 * 24)
     uint public immutable upKeepInterval;
+
+    /// @notice Counter abstraction used to index the current day's purchase orders and schedule future purchase orders 
     uint public purchaseSlot;
+
+    /// @notice Timestamp of last fully execute performUpkeep used to maintain daily upkeep cadence
     uint public lastTimeStamp;
-    uint public fee;
-    uint public slippageFactor = 99;
-    uint public minPurchaseAmount = 100e18;
-    
-    /// @notice Ensures all swaps are executed if necessary before incrementing purchase slot and lastTimeStamp
+
+    /// @notice Ensures all pairId swaps are evaluated before incrementing the purchase slot and lastTimeStamp
     uint public swapIndex = 1;
     
-    /// @notice Tracks first swap timestamp of purchase slot to maintain daily upkeep cadence
+    /// @notice Tracks timestamp when swapIndex=1 to maintain earliest lastTimeStamp value when swapIndex=reversePairs.length
     uint public firstTimeStamp;
+
+    /// @notice Treasury service fee
+    uint public fee;
+
+    /// @notice ( 100 - slippageFactor ) gives global swap slippage tolerance
+    uint public slippageFactor = 99;
+
+    /// @notice Defines minimum purchase amount per interval for initiating new strategies and topping up existing strategies
+    uint public minPurchaseAmount = 100e18;
     
     /// @notice V2 swap router
     IUniswapV2Router public immutable swapRouterV2 = IUniswapV2Router(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff);
@@ -322,7 +334,7 @@ contract StrategyFactory is Ownable {
      *   user's existing strategy and if one exists, it fills that purchase slot and updates the 
      *   topUpAmount accordingly
      */
-    function topUpStrategy(address sourceAsset, address targetAsset, uint topUpAmount) public payable {
+    function topUpStrategy(address sourceAsset, address targetAsset, uint topUpAmount) public {
         uint _pairId = pairs[sourceAsset][targetAsset];
         require(_pairId > 0, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining > 0, "No existing strategy for pair");
