@@ -1,15 +1,5 @@
-# Basic Sample Hardhat Project
+# Gravity
+An EVM application that automates on-chain dollar cost averaging strategies.
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
-
-Try running some of the following tasks:
-
-```shell
-npx hardhat accounts
-npx hardhat compile
-npx hardhat clean
-npx hardhat test
-npx hardhat node
-node scripts/sample-script.js
-npx hardhat help
-```
+## Architecture Diagram
+<img width="1297" alt="image" src="https://user-images.githubusercontent.com/34758484/181005815-a5b8398a-38d1-4e0a-86e2-9ca6a56f3225.png">
