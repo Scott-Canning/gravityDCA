@@ -1,6 +1,5 @@
 const { assert } = require("chai");
 const { ethers } = require("hardhat");
-//const { hrtime } = require("process");
 
 
 describe("StrategyFactory.sol: Local Upkeep Simulation", function () {

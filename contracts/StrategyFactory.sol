@@ -270,7 +270,7 @@ contract StrategyFactory is Ownable {
      */
     function initiateNewStrategy(address sourceAsset, address targetAsset, uint sourceBalance, uint interval, uint purchaseAmount) public {
         uint _pairId = pairs[sourceAsset][targetAsset];
-        require(_pairId > 0 && _pairId < reversePairs.length, "Pair does not exist");
+        require(_pairId > 0, "Pair does not exist");
         require(accounts[msg.sender][_pairId].purchasesRemaining == 0, "Existing strategy");
         require(interval == 1 || interval == 7 || interval == 14 || interval == 21 || interval == 30, "Unsupported interval");
         depositSource(sourceAsset, sourceBalance);
@@ -363,22 +363,20 @@ contract StrategyFactory is Ownable {
         // If remainder 'shortfall' below purchaseAmount on final purchase slot of existing strategy, fill
         for(uint i = 0; i < purchaseOrders[_strategyLastSlot][_pairId].length; i++) {
             if(purchaseOrders[_strategyLastSlot][_pairId][i].user == msg.sender) {
-                if(purchaseOrders[_strategyLastSlot][_pairId][i].pairId == _pairId) {
-                    uint _amountLastSlot = purchaseOrders[_strategyLastSlot][_pairId][i].amount;
-                    if(_amountLastSlot < _purchaseAmount) {
-                        if(_balance > (_purchaseAmount - _amountLastSlot)) {
-                            _balance -= (_purchaseAmount - _amountLastSlot);
-                            purchaseOrders[_strategyLastSlot][_pairId][i].amount = _purchaseAmount;
-                        } else if (_balance < (_purchaseAmount - _amountLastSlot)) {
-                            purchaseOrders[_strategyLastSlot][_pairId][i].amount += _balance;
-                            _balance = 0;
-                        } else {
-                            purchaseOrders[_strategyLastSlot][_pairId][i].amount = _purchaseAmount;
-                            _balance = 0;
-                        }
+                uint _amountLastSlot = purchaseOrders[_strategyLastSlot][_pairId][i].amount;
+                if(_amountLastSlot < _purchaseAmount) {
+                    if(_balance > (_purchaseAmount - _amountLastSlot)) {
+                        _balance -= (_purchaseAmount - _amountLastSlot);
+                        purchaseOrders[_strategyLastSlot][_pairId][i].amount = _purchaseAmount;
+                    } else if (_balance < (_purchaseAmount - _amountLastSlot)) {
+                        purchaseOrders[_strategyLastSlot][_pairId][i].amount += _balance;
+                        _balance = 0;
+                    } else {
+                        purchaseOrders[_strategyLastSlot][_pairId][i].amount = _purchaseAmount;
+                        _balance = 0;
                     }
-                    break; // Break once strategy is found
                 }
+                break; // Break once user's purchase order is found
             }
         }
 
@@ -440,7 +438,11 @@ contract StrategyFactory is Ownable {
         return treasury[sourceAsset];
     }
 
-    /// @notice [TESTING] Allows governing contract to withdraw treasury assets
+    /**
+     * @notice Allows governing contract to withdraw treasury assets
+     * @param token Address of token to be withdrawn
+     * @param amount Amount to be withdrawn
+     */
     function withdrawTreasury(address token, uint amount) external onlyOwner {
         require(treasury[token] >= amount, "Amount exceeds balance");
         treasury[token] -= amount;
@@ -506,7 +508,7 @@ contract StrategyFactory is Ownable {
     /// @notice [TESTING] checkUpkeep keeper integration placeholder function for testing purposes
     function checkUpkeepTEST(uint _pairId /* bytes calldata checkData */) external  {
         require(_pairId > 0 && _pairId < reversePairs.length, "Pair does not exist");
-        if((block.timestamp - lastTimeStamp) > upKeepInterval){
+        if((block.timestamp - lastTimeStamp) > upKeepInterval) {
             uint _purchaseAmount = accumulatePurchaseOrders(purchaseSlot, _pairId);
             performUpkeepTEST(_pairId, _purchaseAmount);
 
@@ -514,7 +516,7 @@ contract StrategyFactory is Ownable {
             // returns (bool upkeepNeeded, bytes memory performData)
             // upkeepNeeded = true;
             // uint _pairId = abi.decode(checkData, (uint));
-            // performData = abi.encode(_pairId, purchaseAmount);
+            // performData = abi.encode(_pairId, _purchaseAmount);
             // return (upkeepNeeded, performData);
             /////////////////////////////////////////////////////
         }
@@ -530,7 +532,7 @@ contract StrategyFactory is Ownable {
             uint _purchaseAmountCheck = accumulatePurchaseOrders(purchaseSlot, _pairId);
             require(_purchaseAmountCheck == _purchaseAmount, "Purchase amount invalid");
             ///////////////// REGISTERED UPKEEP /////////////////
-            // (uint _pairId, uint purchaseAmount) = abi.decode(performData, (uint, uint));
+            // (uint _pairId, uint _purchaseAmount) = abi.decode(performData, (uint, uint));
             /////////////////////////////////////////////////////
             uint _purchased;
             if(_purchaseAmount > 0) {
