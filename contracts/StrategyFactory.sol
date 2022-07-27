@@ -303,7 +303,7 @@ contract StrategyFactory is Ownable {
         }
 
         accounts[msg.sender][_pairId] = Strategy(purchaseSlot + interval,
-                                                 0,
+                                                 _targetBalance,
                                                  interval,
                                                  purchaseAmount,
                                                  _purchasesRemaining
