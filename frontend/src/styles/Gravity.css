@@ -1,0 +1,8 @@
+.Gravity {
+    background-color: rgb(42, 39, 39);
+    height: 100%;
+    position: absolute;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+}

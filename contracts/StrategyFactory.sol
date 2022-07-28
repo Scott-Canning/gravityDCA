@@ -19,7 +19,7 @@ interface IUniswapV2Router {
  */
 contract StrategyFactory is Ownable {
     /// @notice [TESTING] boolean for conditional checks on testing environment
-    bool public localTesting = true;
+    bool public localTesting = false;
 
     /// @notice Time delta that must be satisfied for checkUpkeep to evaluate true (60 * 60 * 24)
     uint public immutable upKeepInterval;
