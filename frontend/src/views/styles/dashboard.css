@@ -9,3 +9,11 @@
     background-repeat: no-repeat;
     background-size: 100%;
   }
+
+  .menu-wrapper__dashboard {
+    display: flex;
+    position: relative;
+    height: 55px;
+    margin-top: 16px;
+    margin-bottom: 32px;
+}

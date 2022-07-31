@@ -9,6 +9,8 @@ const Portfolio = () => {
         <div className='content'>
             <div>
                 <Header/>
+            </div>
+            <div className='menu-wrapper__portfolio'>
                 <Menu/>
             </div>
         </div>

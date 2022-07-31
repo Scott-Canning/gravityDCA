@@ -9,6 +9,8 @@ const Dashboard = () => {
         <div className='content'>
             <div>
                 <Header/>
+            </div>
+            <div className='menu-wrapper__dashboard'>
                 <Menu/>
             </div>
         </div>

@@ -34,7 +34,7 @@
   margin-bottom: 15px;
 }
 
-.content {
+.content__landing {
   display: flex;
   flex-direction: column;
   position: absolute;
@@ -77,8 +77,8 @@
   font-weight: 500;
   color: rgb(141, 213, 128);
   margin: 5px;
-  padding: 12px;
-  border-radius: 18px;
+  padding: 10px;
+  border-radius: 8px;
   border-style: solid;
   background-color: rgb(119, 117, 117);
 }
