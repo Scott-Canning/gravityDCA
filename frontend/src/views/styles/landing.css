@@ -6,7 +6,6 @@
   color: rgb(141, 213, 128);
   margin-top: 45px;
   margin-bottom: 25px;
-  /* color: rgb(157, 236, 143); */
 }
 
 .sub-title {
@@ -40,7 +39,7 @@
   position: absolute;
   height: 100%;
   width: 100%;
-  background-image: url("../images/stone.png");
+  background-image: url("../../images/stone.png");
   background-position: center;
   background-repeat: no-repeat;
   background-size: 100%;

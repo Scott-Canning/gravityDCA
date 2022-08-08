@@ -1,10 +1,30 @@
 import React from 'react';
+import Select from 'react-select';
 import './styles/deposit.css';
 import Header from '../components/header';
 import Menu from '../components/menu';
+import { selectStyles } from './styles/selectStyles';
+import dai_icon from '../images/dai_icon.png';
+import eth_icon from '../images/eth_icon.png';
+import wbtc_icon from '../images/wbtc_icon.png';
 
 const Deposit = () => {
-    const [depositAsset, setDepositAsset] = React.useState("");
+    const [fundingAsset, setFundingAsset] = React.useState("");
+    const [purchaseAsset, setPurchaseAsset] = React.useState("");
+
+    const fundingAssets = 
+    [
+        {value:'dai',label: 'DAI', image: dai_icon},
+        {value: 'weth', label: 'WETH', image: eth_icon},
+        {value: 'wbtc', label: 'WBTC', image: wbtc_icon}
+    ];
+
+    const purchaseAssets = 
+    [
+        {value:'dai',label: 'DAI', image: dai_icon},
+        {value: 'weth', label: 'WETH', image: eth_icon},
+        {value: 'wbtc', label: 'WBTC', image: wbtc_icon}
+    ];
 
     return (
         <div className='content__deposit'>
@@ -23,24 +43,44 @@ const Deposit = () => {
                         <div className='asset-selection-container'>
                             <div className='funding-asset-container'>
                                 <div className='title-container__funding-asset'>
-                                    Select Funding Asset
+                                    Funding Asset
                                 </div>
                                 <div className='selector-container__funding-asset'>
-                                    <div>
-                                        <select className='selector__funding-asset' selected={depositAsset} onChange={e => setDepositAsset(e.target.value)}>
-                                            <option className='option-asset' value="" { ...depositAsset === '' ? 'selected="selected"' : '' }></option>
-                                            <option className='option-asset' value="DAI" { ...depositAsset === 'DAI' ? 'selected="selected"' : '' }>DAI</option>
-                                            <option className='option-asset' value="DAI" { ...depositAsset === 'WETH' ? 'selected="selected"' : '' }>WETH</option>
-                                        </select>
-                                    </div>
+                                    <Select 
+                                        options={fundingAssets}
+                                        styles={selectStyles}
+                                        formatOptionLabel={asset => (
+                                        <div className='option-container'>
+                                            <div>
+                                                <img src={asset.image} alt="NA" className='option-img'/>
+                                            </div>
+                                            <div className='option-text'>
+                                                {asset.label}
+                                            </div>
+                                        </div>
+                                        )}
+                                    />
                                 </div>
                             </div>
                             <div className='purchase-asset-container'>
                             <div className='title-container__purchase-asset'>
-                                    Select Purchase Asset
+                                    Purchase Asset
                                 </div>
                                 <div className='selector-container__purchase-asset'>
-                                    Purchase Asset Selector
+                                    <Select 
+                                        options={purchaseAssets}
+                                        styles={selectStyles}
+                                        formatOptionLabel={asset => (
+                                        <div className='option-container'>
+                                            <div>
+                                                <img src={asset.image} alt="NA" className='option-img'/>
+                                            </div>
+                                            <div className='option-text'>
+                                                {asset.label}
+                                            </div>
+                                        </div>
+                                        )}
+                                    />
                                 </div>
                             </div>
                         </div>

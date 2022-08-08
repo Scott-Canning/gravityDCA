@@ -20,7 +20,7 @@
     flex-direction: column;
     position: absolute;
     width: 100%;
-    height: 725px;
+    height: 750px;
     align-items: center;
     justify-content: top;
 }
@@ -35,10 +35,10 @@
     justify-content: center;
     margin-top: 10px;
     border-radius: 18px;
-    background-image: url("../images/stone.png");
+    background-image: url("../../images/stone.png");
     background-position: center;
     background-repeat: no-repeat;
-    /* background-size: 100%; */
+    background-size: 110%;
 }
 
 .title-container__deposit {
@@ -74,7 +74,6 @@
 /*
   ASSET SELECTION CONTAINER
 */
-
 .asset-selection-container {
     display: flex;
     position: relative;
@@ -90,7 +89,6 @@
 /*
   FUNDING ASSET SELECTION
 */
-
 .funding-asset-container {
     display: flex;
     position: relative;
@@ -114,6 +112,7 @@
     font-family: futura;
     font-weight: 500;
     color: white;
+    margin-top: 10px;
 }
 
 .selector-container__funding-asset {
@@ -124,26 +123,25 @@
     align-items: center;
     justify-content: center;
     border-radius: 12px;
-    background-color: rgb(52, 103, 130);
+    background-color: black;
+    margin-bottom: 10px;
 }
 
 .selector__funding-asset {
     position: relative;
     font-size: 1.2rem;
     padding-left: 30px;
-    width: 125px;
-    height: 38px;
+    width: 150px;
+    height: 42px;
     border-radius: 8px;
-    border-color: black;
-    background-color: rgb(0, 0, 0);
+    border-color: rgb(64, 64, 64);
+    background-color: rgb(64, 64, 64);
     color: rgb(255, 251, 251);
 }
-
 
 /*
   PURCHASE ASSET SELECTION
 */
-
 .purchase-asset-container {
     display: flex;
     position: relative;
@@ -167,6 +165,7 @@
     font-family: futura;
     font-weight: 500;
     color: white;
+    margin-top: 10px;
 }
 
 .selector-container__purchase-asset {
@@ -177,13 +176,55 @@
     align-items: center;
     justify-content: center;
     border-radius: 12px;
-    background-color: rgb(52, 103, 130);
+    background-color: black;
+    margin-bottom: 10px;
+}
+
+.selector__purchase-asset {
+    display: inline-block;
+    position: relative;
+    font-size: 1.2rem;
+    padding-left: 30px;
+    width: 150px;
+    height: 43px;
+    border-radius: 8px;
+    border-color: rgb(64, 64, 64);
+    background-color: rgb(64, 64, 64);
+    color: rgb(255, 251, 251);
+}
+
+/*
+  SELECT OPTION STYLING
+*/
+.option-container {
+    display: flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    font-family: futura;
+    color: white;
+    font-size: 1.2rem;
+    background: black;
+    border-radius: 8px;
+    width: 112px;
+    height: 40px;
+}
+
+.option-img {
+    display: flex;
+    position: relative;
+    width: 32px;
+    margin-right: 8px;
+}
+
+.option-text {
+    display: flex;
+    position: relative;
 }
 
 /*
   DEPOSIT AMOUNT CONTAINER
 */
-
 .deposit-amount-container {
     display: flex;
     position: relative;
@@ -219,9 +260,8 @@
     justify-content: center;
     margin-top: 15px;
     border-radius: 18px;
-    background-image: url("../images/stone.png");
+    background-image: url("../../images/stone.png");
     background-position: center;
     background-repeat: no-repeat;
-    background-size: 100%;
+    background-size: 110%;
 }
-
