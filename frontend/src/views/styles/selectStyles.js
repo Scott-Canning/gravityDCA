@@ -10,31 +10,31 @@ export const selectStyles = {
         backgroundColor: 'black',
         borderColor: 'black',
     }),
-    valueContainer: (provided) => ({
+    valueContainer: (provided, state) => ({
         ...provided,
-        backgroundColor: 'rgb(64, 64, 64)',
+        backgroundColor: state.hasValue ? 'rgb(64, 64, 64)': 'rgb(141, 213, 128)',
         height: 45,
         padding: 1,
         borderRadius: 10
     }),
-    indicatorsContainer: (provided) => ({
-        backgroundColor: 'rgb(64, 64, 64)',
+    indicatorsContainer: (_, state) => ({
+        backgroundColor: state.hasValue ? 'rgb(64, 64, 64)': 'rgb(141, 213, 128)',
         borderWidth: '0px',
         borderRadius: 10,
-        padding: 0
     }),
     placeholder: (provided) => ({
         ...provided,
         color: 'white',
-        fontFamily: 'futura',
-        paddingLeft: 23,
+        fontFamily: 'menlo',
+        paddingLeft: 8,
+        fontSize: 13,
     }),
-    control: (provided) => ({
+    control: (provided, state) => ({
         ...provided,
-        width: 155,
+        width: state.hasValue ? 168 : 168,
         border: '0px solid',
         boxShadow: 'none',
         borderRadius: 10,
-        backgroundColor: 'rgb(64, 64, 64)'
+        backgroundColor: state.hasValue ? 'rgb(64, 64, 64)' : 'rgb(141, 213, 128)',
     }),
 }

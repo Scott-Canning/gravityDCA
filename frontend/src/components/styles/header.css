@@ -35,11 +35,12 @@
   right: 5%;
 }
 
-button:hover{
+.button__connect-wallet:hover{
+  background-image: none;
   background-color:rgb(170, 166, 157);
   border-width: 0px;
 }
 
-button:active{
-  background-color:rgb(255, 255, 255);
+.button__connect-wallet:active{
+  background-color: rgb(64, 64, 64);
 }

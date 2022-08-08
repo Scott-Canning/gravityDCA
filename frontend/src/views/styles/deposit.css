@@ -29,7 +29,7 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    width: 525px;
+    width: 490px;
     height: 400px;
     align-items: center;
     justify-content: center;
@@ -38,7 +38,7 @@
     background-image: url("../../images/stone.png");
     background-position: center;
     background-repeat: no-repeat;
-    background-size: 110%;
+    background-size: 120%;
 }
 
 .title-container__deposit {
@@ -58,17 +58,6 @@
     color: rgb(215, 211, 211);
     margin-top: 0px;
     margin-bottom: 0px;
-}
-
-.line-break {
-    display: flex;
-    position: absolute;
-    width: 90%;
-    height: 1.35px;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 200px;
-    background-color: rgb(141, 213, 128);
 }
 
 /*
@@ -91,8 +80,8 @@
 */
 .funding-asset-container {
     display: flex;
-    position: relative;
     flex-direction: column;
+    position: relative;
     width: 100%;
     height: 100%;
     align-items: center;
@@ -111,7 +100,7 @@
     font-size: 1rem;
     font-family: futura;
     font-weight: 500;
-    color: white;
+    color: rgb(215, 211, 211);
     margin-top: 10px;
 }
 
@@ -164,7 +153,7 @@
     font-size: 1rem;
     font-family: futura;
     font-weight: 500;
-    color: white;
+    color: rgb(215, 211, 211);
     margin-top: 10px;
 }
 
@@ -201,9 +190,9 @@
     position: relative;
     align-items: center;
     justify-content: center;
-    font-family: futura;
+    font-family: menlo;
     color: white;
-    font-size: 1.2rem;
+    font-size: 1.18rem;
     background: black;
     border-radius: 8px;
     width: 112px;
@@ -225,8 +214,9 @@
 /*
   DEPOSIT AMOUNT CONTAINER
 */
-.deposit-amount-container {
+.amount-interval-container {
     display: flex;
+    flex-direction: column;
     position: relative;
     width: 96%;
     height: 50%;
@@ -235,19 +225,196 @@
     margin-top: 10px;
     border-radius: 12px;
     background-color: rgb(0, 0, 0);
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.funding-amount-container {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 33.33%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
+
+.title-container__funding-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+}
+
+.input-container__funding-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+}
+
+.funding-asset-display {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: white;
+}
+
+.purchase-amount-container {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 33.33%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
+
+.title-container__purchase-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+}
+
+.input-container__purchase-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.input-amounts {
+    width: 165px;
+    height: 45px;
+    border-width: 0px;
+    border-radius: 10px;
+    background-color: rgb(64, 64, 64);
+    font-family: menlo;
+    color: white;
+    font-size: 1.2rem;
+    text-align: right;
+    padding-right: 8px;
+    box-sizing: border-box;
+}
+
+.purchase-interval-container {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 33.33%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
+
+.title-container__interval {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+}
+
+.selector-container__interval {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: black;
+}
+
+.interval-spacing-block {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: white;
 }
 
 .button-wrapper__inititate-strategy {
     display: flex;
     position: relative;
     width: 96%;
-    height: 20%;
+    height: 55px;
     align-items: center;
     justify-content: center;
     margin-top: 10px;
     margin-bottom: 10px;
     border-radius: 12px;
+}
+
+.button__initiate-strategy {
+    font-size: 1.15rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(141, 213, 128);
+    height: 50px;
+    width: 180px;
+    border-radius: 8px;
+    border-style: solid;
+    border-width: 0px;
+    border-color: rgb(0, 0, 0);
     background-color: rgb(0, 0, 0);
+    background-position: center;
+    background-size: 150px;
+}
+
+.button__initiate-strategy:hover {
+    background-color: rgb(64, 64, 64);
+}
+
+.button__initiate-strategy:active {
+    background-color: rgb(170, 166, 157)
 }
 
 .deployment-schedule-container {

@@ -82,11 +82,11 @@
   background-color: rgb(119, 117, 117);
 }
 
-button:hover{
+.button__launch-app:hover{
   background-color:rgb(170, 166, 157);
   border-width: 0px;
 }
 
-button:active{
+.button__launch-app:active{
   background-color:rgb(255, 255, 255);
 }
