@@ -11,7 +11,7 @@
     display: flex;
     position: relative;
     width: 460px;
-    height: 55px;
+    height: 50px;
     align-items: center;
     justify-content: center;
     background-color: rgb(64, 64, 64);
@@ -32,7 +32,7 @@
     font-family: futura;
     font-weight: 500;
     color: rgb(215, 211, 211);
-    width: 138px;
+    width: 145px;
     height: 45px;
     margin: 5px;
     padding: 2px;
@@ -56,7 +56,7 @@
     font-family: futura;
     font-weight: 500;
     color: rgb(215, 211, 211);
-    width: 138px;
+    width: 145px;
     height: 45px;
     margin: 5px;
     padding: 2px;
@@ -80,7 +80,7 @@
     font-family: futura;
     font-weight: 500;
     color: rgb(215, 211, 211);
-    width: 138px;
+    width: 145px;
     height: 45px;
     margin: 5px;
     padding: 2px;

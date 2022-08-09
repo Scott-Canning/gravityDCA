@@ -1,9 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Select from 'react-select';
 import './styles/deposit.css';
 import Header from '../components/header';
 import Menu from '../components/menu';
 import { selectStyles } from './styles/selectStyles';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    defaults
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+import { add, getMonth, getDate, getYear } from 'date-fns';
 import dai_icon from '../images/dai_icon.png';
 import eth_icon from '../images/eth_icon.png';
 import wbtc_icon from '../images/wbtc_icon.png';
@@ -14,6 +25,23 @@ const Deposit = () => {
     const [fundingAmount, setFundingAmount] = useState("");
     const [purchaseAmount, setPurchaseAmount] = useState("");
     const [purchaseInterval, setPurchaseInterval] = useState("");
+    const [chartLabels, setChartLabels] = useState([]);
+    const [chartData, setChartData] = useState([]);
+
+    const purchaseAssetRef = useRef();
+
+    useEffect(() => {
+        calcDeploymentSchedule();
+    }, [purchaseInterval, fundingAmount, purchaseAmount])
+
+    useEffect(() => {
+        if(fundingAsset !== '' && purchaseAsset !== '' && fundingAsset === purchaseAsset) {
+            window.alert("Funding asset and purchase asset must be different tokens");
+            setPurchaseAsset('');
+            resetPurchaseAssetSelect();
+        }
+    }, [fundingAsset, purchaseAsset])
+
 
     const fundingAssetsOptions = 
     [
@@ -57,6 +85,10 @@ const Deposit = () => {
         setPurchaseInterval(interval.value);
     };
 
+    const resetPurchaseAssetSelect = () => {
+        purchaseAssetRef.current.setValue('');
+    }
+
     function validateAmount(e) {
         var theEvent = e || window.event;
         // handle paste
@@ -74,6 +106,77 @@ const Deposit = () => {
         }
     }
 
+    ChartJS.register(
+        CategoryScale,
+        LinearScale,
+        BarElement,
+        Title,
+        Tooltip,
+    );
+
+    const deploymentSchedule = {
+        labels: chartLabels,
+        datasets: [
+            {
+                id: '',
+                label: fundingAsset,
+                data: chartData,
+                backgroundColor: 'rgb(141, 213, 128)',
+            },
+        ],
+    };
+
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            title: {
+                display: true,
+                text: 'Estimated Deployment Schedule',
+                font: 'Futura'
+            },
+        },
+        scales: {
+            y: {
+                suggestedMin: 0,
+                suggestedMax: 500
+            }
+        }
+    };
+
+    const calcDeploymentSchedule = async () => {
+        if(purchaseInterval !== '' && fundingAmount !== '' && purchaseAmount  !== '') {
+            setChartLabels([]);
+            setChartData([]);
+            
+            let date = new Date().setHours(12, 0, 0, 0);
+            let purchases = parseInt(fundingAmount / purchaseAmount);
+            const remainder = fundingAmount % purchaseAmount;
+            if(remainder > 0) {
+                purchases += 1;
+            }
+
+            for(let i = 0; i < purchases; i++) {
+                if(remainder > 0 && (i === purchases - 1)) {
+                    setChartData(oldArray => [...oldArray, remainder]);
+                } else {
+                    setChartData(oldArray => [...oldArray, purchaseAmount]);
+                }
+
+                date = add(date, {
+                    year: 0,
+                    month: 0,
+                    days: purchaseInterval
+                })
+                let formattedDate = (getMonth(date) + 1) + '/' + getDate(date) + '/' + getYear(date);
+                setChartLabels(oldArray => [...oldArray, formattedDate]);
+            }
+        }
+    }
+    
+    defaults.font.family = 'futura';
+    defaults.color = 'rgb(215, 211, 211)';
+
     return (
         <div className='content__deposit'>
             <div>
@@ -85,7 +188,7 @@ const Deposit = () => {
                 </div>
                 <div className='deposit-container'>
                     <div className='title-container__deposit'>
-                        <p className='title__deposit'>Configure Your Dollar Cost Averaging Strategy</p>
+                        <p className='title__deposit'>Configure A Dollar Cost Averaging Strategy</p>
                     </div>
                     <div className='init-new-strategy-container'>
                         <div className='asset-selection-container'>
@@ -122,15 +225,16 @@ const Deposit = () => {
                                         styles={selectStyles}
                                         onChange={purchaseAssetChange}
                                         placeholder={<div>Select a token</div>}
+                                        ref={purchaseAssetRef}
                                         formatOptionLabel={asset => (
-                                        <div className='option-container'>
-                                            <div>
-                                                <img src={asset.image} alt="NA" className='option-img'/>
+                                            <div className='option-container'>
+                                                <div>
+                                                    <img src={asset.image} alt="" className='option-img'/>
+                                                </div>
+                                                <div className='option-text'>
+                                                    {asset.label}
+                                                </div>
                                             </div>
-                                            <div className='option-text'>
-                                                {asset.label}
-                                            </div>
-                                        </div>
                                         )}
                                     />
                                 </div>
@@ -146,7 +250,7 @@ const Deposit = () => {
                                         className='input-amounts'
                                         value={fundingAmount} 
                                         type='text' 
-                                        onKeyPress={e => validateAmount(e)} 
+                                        onKeyPress={e => validateAmount(e)}
                                         onInput={e => setFundingAmount(e.target.value)}
                                         placeholder="0.0"
                                     />
@@ -171,7 +275,7 @@ const Deposit = () => {
                                         className='input-amounts'
                                         value={purchaseAmount} 
                                         type='text' 
-                                        onKeyPress={e => validate(e)} 
+                                        onKeyPress={e => validateAmount(e)} 
                                         onInput={e => setPurchaseAmount(e.target.value)}
                                         placeholder="0.0"
                                     />
@@ -216,7 +320,9 @@ const Deposit = () => {
                         </div>
                     </div>
                     <div className='deployment-schedule-container'>
-                        Deployment Schedule Container
+                        <div className='chart-container'>
+                            <Bar type='bar' options={chartOptions} data={deploymentSchedule} />
+                        </div>
                     </div>
                 </div>
             </div>

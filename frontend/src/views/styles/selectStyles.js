@@ -10,15 +10,13 @@ export const selectStyles = {
         backgroundColor: 'black',
         borderColor: 'black',
     }),
-    valueContainer: (provided, state) => ({
+    valueContainer: (provided) => ({
         ...provided,
-        backgroundColor: state.hasValue ? 'rgb(64, 64, 64)': 'rgb(141, 213, 128)',
         height: 45,
         padding: 1,
         borderRadius: 10
     }),
-    indicatorsContainer: (_, state) => ({
-        backgroundColor: state.hasValue ? 'rgb(64, 64, 64)': 'rgb(141, 213, 128)',
+    indicatorsContainer: () => ({
         borderWidth: '0px',
         borderRadius: 10,
     }),
@@ -31,10 +29,11 @@ export const selectStyles = {
     }),
     control: (provided, state) => ({
         ...provided,
-        width: state.hasValue ? 168 : 168,
+        backgroundColor: state.hasValue ? 'rgb(64, 64, 64)' : 'rgb(141, 213, 128)',
+        transition: 300,
+        width: 168,
         border: '0px solid',
         boxShadow: 'none',
         borderRadius: 10,
-        backgroundColor: state.hasValue ? 'rgb(64, 64, 64)' : 'rgb(141, 213, 128)',
     }),
 }
