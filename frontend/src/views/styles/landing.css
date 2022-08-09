@@ -1,0 +1,92 @@
+.title__landing {
+  text-align: left;
+  font-size: 5rem;
+  font-family: futura;
+  font-weight: 400;
+  color: rgb(141, 213, 128);
+  margin-top: 45px;
+  margin-bottom: 25px;
+}
+
+.sub-title {
+  text-align: left;
+  font-size: 1.75rem;
+  font-family: futura;
+  font-weight: 400;
+  color: rgb(119, 117, 117);
+  margin:0;
+}
+
+.title-wrapper {
+  display: flex;
+  position: relative;
+  width: 100%;
+  margin-left: 46px;
+  margin-top: 220px;
+}
+
+.sub-title-wrapper {
+  display: flex;
+  position: relative;
+  width: 100%;
+  margin-left: 46px;
+  margin-bottom: 15px;
+}
+
+.content__landing {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  background-image: url("../../images/stone.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100%;
+}
+
+.disclaimer {
+  font-family: futura;
+  font-weight: 400;
+  color: rgb(119, 117, 117);
+  width: 550px;
+}
+
+.disclaimer-wrapper {
+  display: flex;
+  position: relative;
+  width: 100%;
+  height: 25%;
+  align-items: center;
+  justify-content: center;
+} 
+
+.button-wrapper__launch-app {
+  display: flex;
+  position: relative;
+  width: 100%;
+  height: 12%;
+  align-items: center;
+  justify-content: center;
+} 
+
+.button__launch-app {
+  font-size: 1.35rem;
+  font-family: futura;
+  font-weight: 500;
+  color: rgb(141, 213, 128);
+  margin: 5px;
+  padding: 10px;
+  border-radius: 8px;
+  border-style: solid;
+  background-color: rgb(119, 117, 117);
+}
+
+.button__launch-app:hover{
+  background-color:rgb(170, 166, 157);
+  border-width: 0px;
+}
+
+.button__launch-app:active{
+  background-color:rgb(255, 255, 255);
+}

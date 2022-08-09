@@ -1,0 +1,447 @@
+.content__deposit {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    background-color: rgb(13,13,13);
+}
+
+.menu-wrapper__deposit {
+    display: flex;
+    position: relative;
+    height: 45px;
+    margin-top: 0px;
+    margin-bottom: 18px;
+}
+
+.deposit-container {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    width: 100%;
+    height: 750px;
+    align-items: center;
+    justify-content: top;
+}
+
+.init-new-strategy-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 490px;
+    height: 400px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 6px;
+    border-radius: 18px;
+    background-image: url("../../images/stone.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 120%;
+}
+
+.title-container__deposit {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2px;
+}
+
+.title__deposit {
+    font-size: 1.15rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+    margin-top: 0px;
+    margin-bottom: 0px;
+}
+
+/*
+  ASSET SELECTION CONTAINER
+*/
+.asset-selection-container {
+    display: flex;
+    position: relative;
+    width: 96%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
+
+/*
+  FUNDING ASSET SELECTION
+*/
+.funding-asset-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+.title-container__funding-asset {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+    margin-top: 10px;
+}
+
+.selector-container__funding-asset {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 70%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: black;
+    margin-bottom: 10px;
+}
+
+.selector__funding-asset {
+    position: relative;
+    font-size: 1.2rem;
+    padding-left: 30px;
+    width: 150px;
+    height: 42px;
+    border-radius: 8px;
+    border-color: rgb(64, 64, 64);
+    background-color: rgb(64, 64, 64);
+    color: rgb(255, 251, 251);
+}
+
+/*
+  PURCHASE ASSET SELECTION
+*/
+.purchase-asset-container {
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    width: 96%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+}
+
+.title-container__purchase-asset {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+    margin-top: 10px;
+}
+
+.selector-container__purchase-asset {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 70%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: black;
+    margin-bottom: 10px;
+}
+
+.selector__purchase-asset {
+    display: inline-block;
+    position: relative;
+    font-size: 1.2rem;
+    padding-left: 30px;
+    width: 150px;
+    height: 43px;
+    border-radius: 8px;
+    border-color: rgb(64, 64, 64);
+    background-color: rgb(64, 64, 64);
+    color: rgb(255, 251, 251);
+}
+
+/*
+  SELECT OPTION STYLING
+*/
+.option-container {
+    display: flex;
+    position: relative;
+    align-items: center;
+    justify-content: center;
+    font-family: menlo;
+    color: white;
+    font-size: 1.18rem;
+    background: black;
+    border-radius: 8px;
+    width: 112px;
+    height: 40px;
+}
+
+.option-img {
+    display: flex;
+    position: relative;
+    width: 32px;
+    margin-right: 8px;
+}
+
+.option-text {
+    display: flex;
+    position: relative;
+}
+
+/*
+  DEPOSIT AMOUNT CONTAINER
+*/
+.amount-interval-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 96%;
+    height: 50%;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.funding-amount-container {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 33.33%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
+
+.title-container__funding-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+}
+
+.input-container__funding-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+}
+
+.funding-asset-display {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: white;
+}
+
+.purchase-amount-container {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 33.33%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
+
+.title-container__purchase-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+}
+
+.input-container__purchase-amount {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.input-amounts {
+    width: 165px;
+    height: 45px;
+    border-width: 0px;
+    border-radius: 10px;
+    background-color: rgb(64, 64, 64);
+    font-family: menlo;
+    color: white;
+    font-size: 1.2rem;
+    text-align: right;
+    padding-right: 8px;
+    box-sizing: border-box;
+}
+
+.purchase-interval-container {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 33.33%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
+
+.title-container__interval {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(215, 211, 211);
+}
+
+.selector-container__interval {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: black;
+}
+
+.interval-spacing-block {
+    display: flex;
+    position: relative;
+    width: 100%;
+    height: 30%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-family: futura;
+    font-weight: 500;
+    color: white;
+}
+
+.button-wrapper__inititate-strategy {
+    display: flex;
+    position: relative;
+    width: 96%;
+    height: 55px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+}
+
+.button__initiate-strategy {
+    font-size: 1.15rem;
+    font-family: futura;
+    font-weight: 500;
+    color: rgb(141, 213, 128);
+    height: 50px;
+    width: 180px;
+    border-radius: 8px;
+    border-style: solid;
+    border-width: 0px;
+    border-color: rgb(0, 0, 0);
+    background-color: rgb(0, 0, 0);
+    background-position: center;
+    background-size: 150px;
+}
+
+.button__initiate-strategy:hover {
+    background-color: rgb(64, 64, 64);
+}
+
+.button__initiate-strategy:active {
+    background-color: rgb(170, 166, 157)
+}
+
+.deployment-schedule-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 490px;
+    height: 200px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 15px;
+    border-radius: 18px;
+    background-image: url("../../images/stone.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 110%;
+}
+
+.chart-container {
+    display: flex;
+    position: relative;
+    width: 96%;
+    height: 90%;
+    padding: 2px;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background-color: rgb(0, 0, 0);
+}
