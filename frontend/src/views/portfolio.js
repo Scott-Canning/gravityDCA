@@ -1,13 +1,47 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import './styles/portfolio.css';
 import Header from '../components/header';
 import Menu from '../components/menu';
 import Table from '../components/table';
+import { selectStyles } from './styles/selectStyles';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    Title,
+    Tooltip,
+    defaults
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
+import { add, getMonth, getDate, getYear } from 'date-fns';
 import { fundingAssetMap } from '../utilities/fundingAssetMap';
 import { pairIdMap } from '../utilities/pairIdMap';
 
 const Portfolio = () => {
-    const[selectedRow, setSelectedRow] = useState("");
+    const [selectedRow, setSelectedRow] = useState("");
+    const [chartLabels, setChartLabels] = useState([]);
+    const [chartData, setChartData] = useState([]);
+
+    // const strategyDetails = {
+    //     1 : {
+    //         nextSlot: 12,
+    //         targetBalance: 1000,
+    //         purchaseInterval: 7,
+    //         purchaseAmount: 10000,
+    //         purchasesRemaining: 5,
+    //         purchaseSlots: [],
+    //         purchaseAmounts: []
+    //     }
+    // }
+
+    const fundingAmount = 10000;
+    const purchaseAmount = 1000;
+    const purchaseInterval = 7;
+
+    useEffect(() => {
+        calcDeploymentSchedule();
+    }, [selectedRow])
 
     const columns = useMemo(
         () => [
@@ -18,7 +52,7 @@ const Portfolio = () => {
                     <div className='cell-style-75'>
                         <div className='pair-wrapper'>
                             <img src={fundingAssetMap[pairIdMap[value].from]} className='img__pair-from-token'/>
-                            <p><i class="arrow right"></i></p>
+                            <p><i className="arrow right"></i></p>
                             <img src={fundingAssetMap[pairIdMap[value].to]} className='img__pair-to-token'/>
                         </div>
                     </div>
@@ -109,7 +143,7 @@ const Portfolio = () => {
             "pair_id": 3,
             "status": "Live",
             "balance": 5.01,
-            "next_purchase": '',
+            "next_purchase": '9/15/22',
             "remaining": 0
         },
         {
@@ -142,6 +176,77 @@ const Portfolio = () => {
         // }
     ];
 
+    ChartJS.register(
+        CategoryScale,
+        LinearScale,
+        BarElement,
+        Title,
+        Tooltip,
+    );
+
+    const deploymentSchedule = {
+        labels: chartLabels,
+        datasets: [
+            {
+                id: '',
+                label: 'WETH',
+                data: chartData,
+                backgroundColor: 'rgb(141, 213, 128)',
+            },
+        ],
+    };
+
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            title: {
+                display: true,
+                text: 'Estimated Deployment Schedule',
+                font: 'Futura'
+            },
+        },
+        scales: {
+            y: {
+                suggestedMin: 0,
+                suggestedMax: 500
+            }
+        }
+    };
+
+    const calcDeploymentSchedule = async () => {
+        if(purchaseInterval !== '' && fundingAmount !== '' && purchaseAmount  !== '') {
+            setChartLabels([]);
+            setChartData([]);
+            
+            let date = new Date().setHours(12, 0, 0, 0);
+            let purchases = parseInt(fundingAmount / purchaseAmount);
+            const remainder = fundingAmount % purchaseAmount;
+            if(remainder > 0) {
+                purchases += 1;
+            }
+
+            for(let i = 0; i < purchases; i++) {
+                if(remainder > 0 && (i === purchases - 1)) {
+                    setChartData(oldArray => [...oldArray, remainder]);
+                } else {
+                    setChartData(oldArray => [...oldArray, purchaseAmount]);
+                }
+
+                date = add(date, {
+                    year: 0,
+                    month: 0,
+                    days: purchaseInterval
+                })
+                let formattedDate = (getMonth(date) + 1) + '/' + getDate(date) + '/' + getYear(date);
+                setChartLabels(oldArray => [...oldArray, formattedDate]);
+            }
+        }
+    }
+    
+    defaults.font.family = 'futura';
+    defaults.color = 'rgb(215, 211, 211)';
+
     return (
         <div className='content__portfolio'>
             <div>
@@ -154,7 +259,7 @@ const Portfolio = () => {
                 <div className='portfolio-container'>
                     <div className='table-header-container__portfolio'>
                         <div className='table-header__portfolio'>
-                            <div style={{width: '9px'}}/>
+                            <div style={{width: '12px'}}/>
                             <p className='table-header-style-75'>Pair</p>
                             <p className='table-header-style-75'>Status</p>
                             <p className='table-header-style-120'>Balance</p>
@@ -170,14 +275,17 @@ const Portfolio = () => {
                                     setSelectedRow(row.id);
                                 },
                                 style: {
-                                    background: row.id === selectedRow ? 'rgb(141, 213, 128)' : '',
-                                    color: row.id === selectedRow ? 'black' : ''
+                                    background: row.id === selectedRow ? 'rgba(141, 213, 128, 0.546)' : '',
+                                    height: row.id === selectedRow ? '50%' : '',
+                                    color: row.id === selectedRow ? 'white' : ''
                                 }
                             })}
                         />
                     </div>
                     <div className='deployment-schedule-container__portfolio'>
-
+                        <div className='chart-container'>
+                            <Bar type='bar' options={chartOptions} data={deploymentSchedule} />
+                        </div>
                     </div>
                 </div>
             </div>
