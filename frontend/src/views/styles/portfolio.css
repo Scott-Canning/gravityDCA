@@ -1,19 +1,219 @@
-.content {
-    display: flex;
-    flex-direction: column;
-    position: absolute;
-    height: 100%;
-    width: 100%;
-    background-image: url("../../images/stone.png");
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: 100%;
+.content__portfolio {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  height: 100%;
+  width: 100%;
+  background-color: rgb(13,13,13);
 }
 
 .menu-wrapper__portfolio {
-    display: flex;
-    position: relative;
-    height: 55px;
-    margin-top: 16px;
-    margin-bottom: 32px;
+  display: flex;
+  position: relative;
+  height: 45px;
+  margin-top: 0px;
+  margin-bottom: 18px;
+}
+
+.portfolio-container {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  width: 100%;
+  height: 950px;
+  align-items: center;
+  justify-content: top;
+}
+
+.table-header-container__portfolio {
+  display: flex;
+  position: relative;
+  width: 750px;
+  height: 32px;
+  align-items: center;
+  justify-content: left;
+}
+
+.table-header__portfolio {
+  display: flex;
+  position: relative;
+  font-size: 1.1rem;
+  font-family: futura;
+  font-weight: 500;
+  color: rgb(215, 211, 211);
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+
+.table-header-style-75 {
+  width: 85px;
+  text-align: center;
+}
+
+.cell-style-75 {
+  width: 80px;
+  margin: auto;
+  padding: 0, 0, 0, 0;
+}
+
+.table-header-style-105 {
+  width: 110px;
+  text-align: center;
+}
+
+.cell-style-105 {
+  width: 105px;
+  margin: auto;
+}
+
+.table-header-style-120 {
+  width: 125px;
+  text-align: center;
+}
+
+.cell-style-120 {
+  width: 120px;
+  margin: auto;
+}
+
+.strategies-container {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 750px;
+  height: 210px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  border-radius: 18px;
+  background-image: url("../../images/stone.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 120%;
+}
+
+.pair-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+  background-color: rgb(64, 64, 64);
+  height: 34px;
+  border-radius: 15px;
+}
+
+.img__pair-from-token {
+  margin-right: 0px;
+  width: 30px;
+}
+
+.img__pair-to-token {
+  width: 30px;
+}
+
+.arrow {
+  border: solid  rgb(141, 213, 128);
+  border-width: 0 3px 3px 0;
+  display: inline-block;
+  padding: 4px;
+  margin-right: 5px;
+}
+
+.right {
+  transform: rotate(-45deg);
+  -webkit-transform: rotate(-45deg);
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 0px;
+  border-radius: 4px; 
+  background-color: rgb(141, 213, 128);
+  height: 24px;
+  color: rgb(24, 125, 47);
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+.ended-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 0px;
+  border-radius: 4px; 
+  background-color: rgb(134, 140, 144);
+  height: 24px;
+  color: rgb(55, 53, 53);
+  margin-right: 10px;
+  margin-left: 10px;
+}
+
+.balance-container {
+  display: flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+}
+
+.balance-value {
+  display: flex;
+  position: relative;
+  justify-content: right;
+  width: 70px;
+}
+
+.divider {
+  width: 10px;
+}
+
+.img__balance-target-asset {
+  display: flex;
+  position: relative;
+  width: 28px;
+}
+
+.button-top-up__portfolio {
+  background-color: rgb(31, 92, 183);
+  border-width: 0px;
+  border-radius: 6px;
+  height: 30px;
+  width: 95px;
+  font-family: menlo;
+  color: white;
+}
+
+.button-withdraw__portfolio {
+  background-color: rgb(31, 92, 183);
+  border-width: 0px;
+  border-radius: 6px;
+  height: 30px;
+  width: 95px;
+  font-family: menlo;
+  color: white;
+}
+
+.button-top-up__portfolio:hover, .button-withdraw__portfolio:hover {
+  background-color: rgb(64, 64, 64);
+}
+
+.button-top-up__portfolio:active, .button-withdraw__portfolio:active {
+  background-color: rgb(170, 166, 157);
+}
+
+.deployment-schedule-container__portfolio {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 750px;
+  height: 300px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 15px;
+  border-radius: 18px;
+  background-image: url("../../images/stone.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 110%;
 }

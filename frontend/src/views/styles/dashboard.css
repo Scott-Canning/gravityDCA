@@ -4,16 +4,13 @@
     position: absolute;
     height: 100%;
     width: 100%;
-    background-image: url("../../images/stone.png");
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: 100%;
-  }
+    background-color: rgb(13,13,13);
+}
 
-  .menu-wrapper__dashboard {
-    display: flex;
-    position: relative;
-    height: 55px;
-    margin-top: 16px;
-    margin-bottom: 32px;
+.menu-wrapper__dashboard {
+  display: flex;
+  position: relative;
+  height: 45px;
+  margin-top: 0px;
+  margin-bottom: 18px;
 }
