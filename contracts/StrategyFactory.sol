@@ -19,7 +19,7 @@ interface IUniswapV2Router {
  */
 contract StrategyFactory is Ownable {
     /// @notice [TESTING] boolean for conditional checks on testing environment
-    bool public localTesting = false;
+    bool public localTesting = true;
 
     /// @notice Time delta that must be satisfied for checkUpkeep to evaluate true (60 * 60 * 24)
     uint public immutable upKeepInterval;
@@ -139,6 +139,32 @@ contract StrategyFactory is Ownable {
      */
     function getPurchaseOrderDetails(uint slot, uint pairId) public view returns (PurchaseOrder[] memory) {
         return purchaseOrders[slot][pairId];
+    }
+
+    /**
+     * @notice Calculates purchase order schedule for user's strategy of passed pairId 
+     * @param user Address of user schedule is being sought for
+     * @param pairId PairId of strategy schedule is being sought for
+     */
+    function getPurchaseSchedule(address user, uint pairId) public view returns (uint256[] memory, uint256[] memory) {
+        uint nextslot = accounts[user][pairId].nextSlot;
+        uint interval = accounts[user][pairId].interval;
+        uint purchasesRemaining = accounts[user][pairId].purchasesRemaining;
+
+        uint[] memory purchaseSlots = new uint[](purchasesRemaining);
+        uint[] memory purchaseAmounts = new uint[](purchasesRemaining);
+
+        for(uint i = 0; i < purchasesRemaining; i++) {
+            uint _nextSlot = nextslot + (interval * i);
+            purchaseSlots[i] = _nextSlot;
+            for(uint k = 0; k < purchaseOrders[_nextSlot][pairId].length; k++){
+                if(purchaseOrders[_nextSlot][pairId][k].user == user){
+                    purchaseAmounts[i] = purchaseOrders[_nextSlot][pairId][k].amount;
+                    break;
+                }
+            }
+        }
+        return(purchaseSlots, purchaseAmounts);
     }
 
     /**
