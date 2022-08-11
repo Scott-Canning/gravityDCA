@@ -18,6 +18,7 @@ import { add, getMonth, getDate, getYear } from 'date-fns';
 import dai_icon from '../images/dai_icon.png';
 import eth_icon from '../images/eth_icon.png';
 import wbtc_icon from '../images/wbtc_icon.png';
+import { fundingAssetMap } from '../utilities/fundingAssetMap';
 
 const Deposit = () => {
     const [fundingAsset, setFundingAsset] = useState("");
@@ -49,13 +50,6 @@ const Deposit = () => {
         {value: 'weth', label: 'WETH', image: eth_icon},
         {value: 'wbtc', label: 'WBTC', image: wbtc_icon}
     ];
-
-    const fundingAssetMap = 
-    {
-        'DAI': dai_icon,
-        'WETH': eth_icon,
-        'WBTC': wbtc_icon
-    }
 
     const purchaseAssetsOptions = 
     [
@@ -319,7 +313,7 @@ const Deposit = () => {
                             </button>
                         </div>
                     </div>
-                    <div className='deployment-schedule-container'>
+                    <div className='deployment-schedule-container__deposit'>
                         <div className='chart-container'>
                             <Bar type='bar' options={chartOptions} data={deploymentSchedule} />
                         </div>

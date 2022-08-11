@@ -25,22 +25,6 @@
     justify-content: top;
 }
 
-.init-new-strategy-container {
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    width: 490px;
-    height: 400px;
-    align-items: center;
-    justify-content: center;
-    margin-top: 6px;
-    border-radius: 18px;
-    background-image: url("../../images/stone.png");
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: 120%;
-}
-
 .title-container__deposit {
     display: flex;
     position: relative;
@@ -58,6 +42,22 @@
     color: rgb(215, 211, 211);
     margin-top: 0px;
     margin-bottom: 0px;
+}
+
+.init-new-strategy-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    width: 490px;
+    height: 400px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 6px;
+    border-radius: 18px;
+    background-image: url("../../images/stone.png");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 120%;
 }
 
 /*
@@ -417,7 +417,7 @@
     background-color: rgb(170, 166, 157)
 }
 
-.deployment-schedule-container {
+.deployment-schedule-container__deposit {
     display: flex;
     flex-direction: column;
     position: relative;

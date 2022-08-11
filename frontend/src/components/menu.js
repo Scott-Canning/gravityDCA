@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './styles/menu.css';
-import { Link, useLocation, useHistory} from "react-router-dom";
+import { Link, useHistory} from "react-router-dom";
 
 const Menu = () => {
     const history = useHistory();
