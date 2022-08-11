@@ -9,6 +9,14 @@
     overflow: auto;
 }
 
+.table-container::-webkit-scrollbar {
+    display: none;
+  }
+
+.inner::-webkit-scrollbar {
+    display: none;
+  }
+
 .table {
     position: relative;
     width: 98%;
@@ -28,8 +36,8 @@
 }
 
 td {
-    padding-top: 3px;
-    padding-bottom: 3px;
+    padding-top: 4px;
+    padding-bottom: 4px;
     overflow: auto;
 }
 
