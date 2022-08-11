@@ -4,8 +4,8 @@
     justify-content: center;
     border-radius: 12px;
     background-color: black;
-    width: 98%;
-    height: 95%;
+    width: 735px;
+    height: 195px;
     overflow: auto;
 }
 
@@ -13,6 +13,7 @@
     position: relative;
     width: 98%;
     border-collapse: collapse;
+    margin: auto;
 }
 
 .table-head {
@@ -26,8 +27,10 @@
     font-family: menlo;
 }
 
-th, td {
-    padding-top: 5px;
+td {
+    padding-top: 3px;
+    padding-bottom: 3px;
+    overflow: auto;
 }
 
 tr {
