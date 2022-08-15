@@ -3,7 +3,6 @@ import './styles/portfolio.css';
 import Header from '../components/header';
 import Menu from '../components/menu';
 import Table from '../components/table';
-import { selectStyles } from './styles/selectStyles';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -18,13 +17,26 @@ import { add, getMonth, getDate, getYear } from 'date-fns';
 import { fundingAssetMap } from '../utilities/fundingAssetMap';
 import { pairIdMap } from '../utilities/pairIdMap';
 
+const PAIR_COUNT = 6
+
 const Portfolio = () => {
     const [selectedRow, setSelectedRow] = useState("");
     const [chartLabels, setChartLabels] = useState([]);
     const [chartData, setChartData] = useState([]);
+    const [userData, setUserData] = useState({});
 
+    // FORMAT -> pairId : {...}
     // const strategyDetails = {
     //     1 : {
+    //         nextSlot: 12,
+    //         targetBalance: 1000,
+    //         purchaseInterval: 7,
+    //         purchaseAmount: 10000,
+    //         purchasesRemaining: 5,
+    //         purchaseSlots: [],
+    //         purchaseAmounts: []
+    //     },
+    //     2 : {
     //         nextSlot: 12,
     //         targetBalance: 1000,
     //         purchaseInterval: 7,
@@ -35,6 +47,33 @@ const Portfolio = () => {
     //     }
     // }
 
+    const getUserData = async (user) => {
+        for(let i = 0; i < PAIR_COUNT; i++) {
+            // [LEFT OFF]
+        }
+        const purchaseSchedule = await strategyFactory.getPurchaseSchedule(user, pair1Id);
+        const [ purchaseSlots, purchaseAmounts ] = purchaseSchedule;
+
+        const expPurchaseSlots = [];
+        const expPurchaseCount = Math.ceil(deposit1 / purchase1);
+        for(let i = 0; i < expPurchaseCount; i++) {
+            expPurchaseSlots[i] = i + 1;
+        }
+        
+        const remainder = deposit1 % purchase1;
+        for(let i = 0; i < expPurchaseCount; i++) {
+            const slot = ethers.BigNumber.from(purchaseSlots[i]).toNumber();
+            assert.equal(slot, expPurchaseSlots[i]);
+
+            const amount = ethers.utils.formatUnits(purchaseAmounts[i], 18);
+            if(remainder > 0 && (i === expPurchaseCount - 1)) {
+                assert.equal(amount, remainder);
+            } else {
+                assert.equal(amount, purchase1);
+            }
+        }
+    }
+
     const fundingAmount = 10000;
     const purchaseAmount = 1000;
     const purchaseInterval = 7;
@@ -43,8 +82,9 @@ const Portfolio = () => {
         calcDeploymentSchedule();
     }, [selectedRow])
 
-    const columns = useMemo(
-        () => [
+    const columns = [
+    // = useMemo(
+    //     () => [
             {
                 Header: "Pair",
                 accessor: "pair_id",
@@ -122,7 +162,7 @@ const Portfolio = () => {
             },
             // top_up & withdraw -> onClick, pass row.original.pair_id prop
         ]
-    );
+    // );
     
     const data = [
         {
@@ -283,7 +323,7 @@ const Portfolio = () => {
                         />
                     </div>
                     <div className='deployment-schedule-container__portfolio'>
-                        <div className='chart-container'>
+                        <div className='chart-container__portfolio'>
                             <Bar type='bar' options={chartOptions} data={deploymentSchedule} />
                         </div>
                     </div>

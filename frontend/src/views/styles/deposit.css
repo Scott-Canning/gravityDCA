@@ -18,9 +18,10 @@
 .deposit-container {
     display: flex;
     flex-direction: column;
-    position: absolute;
-    width: 100%;
+    position: relative;
+    width: 490px;
     height: 750px;
+    margin: auto;
     align-items: center;
     justify-content: top;
 }
@@ -49,7 +50,7 @@
     flex-direction: column;
     position: relative;
     width: 490px;
-    height: 400px;
+    height: 385px;
     align-items: center;
     justify-content: center;
     margin-top: 6px;
@@ -66,11 +67,11 @@
 .asset-selection-container {
     display: flex;
     position: relative;
-    width: 96%;
+    width: 475px;
     height: 30%;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 7.5px;
     border-radius: 12px;
     background-color: rgb(0, 0, 0);
 }
@@ -218,11 +219,11 @@
     display: flex;
     flex-direction: column;
     position: relative;
-    width: 96%;
+    width: 475px;
     height: 50%;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 7.5px;
     border-radius: 12px;
     background-color: rgb(0, 0, 0);
     padding-top: 6px;
@@ -388,8 +389,8 @@
     height: 55px;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
-    margin-bottom: 10px;
+    margin-top: 7.5px;
+    margin-bottom: 7.5px;
     border-radius: 12px;
 }
 
@@ -433,11 +434,11 @@
     background-size: 110%;
 }
 
-.chart-container {
+.chart-container__deposit {
     display: flex;
     position: relative;
-    width: 96%;
-    height: 90%;
+    width: 475px;
+    height: 185px;
     padding: 2px;
     box-sizing: border-box;
     align-items: center;

@@ -1,14 +1,47 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './styles/header.css';
+import useMetaMask from '../hooks/MetaMask.js';
+import { formatAddress } from '../utilities/formatAddress';
+import { networkIdMap } from '../utilities/networks';
+
 
 const Header = () => {
+    const [network, setNetwork] = useState('');
+    const [isHovering, setHover] = useState(false);
+    const { connect, account, disconnect, isActive, isLoading, library } = useMetaMask();
+
+    useEffect(() => {
+        getNetwork().then(val => {
+            setNetwork(val);
+        })
+    }, [isActive]);
+
+    const getNetwork = async () => {
+        const nw = await library.getNetwork();
+        return nw.chainId;
+    }
+
     return (
-        <div className='Header'>
+        <div className='header'>
             <div>
                 <h1 className='title__header'>Gravity</h1>
             </div>
-            <div>
-                <button className='button__connect-wallet'>Connect Wallet</button>
+            <div className='wallet-connection-container'>
+                <div className='network-indicator-container'>
+                    <div className='network-indicator'>
+                    { isActive ? '🟢 ' + networkIdMap[network] : '🔴 Not Connected' }
+                    </div>
+                </div>
+                <div className='button-container__connect-wallet'>
+                    <button className='button__connect-wallet' onClick={isActive && isHovering ? disconnect : connect}
+                        onMouseEnter={() => setHover(true)}
+                        onMouseLeave={() => setHover(false)}>
+                        { isActive ?
+                            (isHovering ? '❌ Disconnect' : formatAddress(account)) :
+                            ('Connect Wallet')
+                        }
+                    </button>
+                </div>
             </div>
         </div>
     )
