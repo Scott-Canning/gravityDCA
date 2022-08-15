@@ -314,7 +314,7 @@ const Deposit = () => {
                         </div>
                     </div>
                     <div className='deployment-schedule-container__deposit'>
-                        <div className='chart-container'>
+                        <div className='chart-container__deposit'>
                             <Bar type='bar' options={chartOptions} data={deploymentSchedule} />
                         </div>
                     </div>
