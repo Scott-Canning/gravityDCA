@@ -4,9 +4,9 @@
   width: 100%;
   height: 64px;
   margin-top: 25px;
+  margin-bottom: 30px;
   padding-left: 6%;
   padding-right: 6%;
-  margin-bottom: 25px;
   box-sizing: border-box;
 }
 
@@ -17,6 +17,7 @@
   font-weight: 400;
   color: rgb(141, 213, 128);
   margin: auto;
+  margin-top: 17px;
 }
 
 .wallet-connection-container {
@@ -28,8 +29,8 @@
   display: flex;
   position: relative;
   color: rgb(215, 211, 211);
-  font-family: futura;
-  font-size: .9rem;
+  font-family: menlo;
+  font-size: .8rem;
   height: 35px;
   width: 150px;
   border-radius: 8px;

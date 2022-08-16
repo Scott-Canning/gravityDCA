@@ -13,9 +13,9 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        enabled: false,
+        enabled: true,
         url: `${process.env.POLYGON_URL}`,
-        //blockNumber: 26487456,
+        blockNumber: 26487456,
        },
     },
     kovan: {

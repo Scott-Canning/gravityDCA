@@ -103,7 +103,7 @@ async function main() {
         console.log("Strategy factory treasury balance: ", ethers.utils.formatUnits(treasury, 18));
     }
     
-    const [ signer1, signer2 ] = await hre.ethers.getSigners();
+    const [ signer1 ] = await hre.ethers.getSigners();
     const upKeepInterval = 60 * 60 * 24;
 
     ////////////////////////////////////////////////////////////////////////////////
