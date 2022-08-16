@@ -19,6 +19,11 @@ import dai_icon from '../images/dai_icon.png';
 import eth_icon from '../images/eth_icon.png';
 import wbtc_icon from '../images/wbtc_icon.png';
 import { fundingAssetMap } from '../utilities/fundingAssetMap';
+import useMetaMask from '../hooks/MetaMask.js';
+import { strategyFactoryAddr, tokens } from '../utilities/addresses';
+import strategyFactoryABI from '../utilities/abis/strategyFactoryABI.json';
+import { tokenABIs } from '../utilities/abis/tokenABIs';
+const { ethers } = require('ethers');
 
 const Deposit = () => {
     const [fundingAsset, setFundingAsset] = useState("");
@@ -28,6 +33,8 @@ const Deposit = () => {
     const [purchaseInterval, setPurchaseInterval] = useState("");
     const [chartLabels, setChartLabels] = useState([]);
     const [chartData, setChartData] = useState([]);
+
+    const { isActive, library } = useMetaMask();
 
     const purchaseAssetRef = useRef();
 
@@ -83,13 +90,12 @@ const Deposit = () => {
         purchaseAssetRef.current.setValue('');
     }
 
+    // Allow numeric inputs only
     function validateAmount(e) {
         var theEvent = e || window.event;
-        // handle paste
         if (theEvent.type === 'paste') {
             key = event.clipboardData.getData('text/plain');
         } else {
-        // handle key press
             var key = theEvent.keyCode || theEvent.which;
             key = String.fromCharCode(key);
         }
@@ -165,6 +171,26 @@ const Deposit = () => {
                 let formattedDate = (getMonth(date) + 1) + '/' + getDate(date) + '/' + getYear(date);
                 setChartLabels(oldArray => [...oldArray, formattedDate]);
             }
+        }
+    }
+
+    const initNewStrategy = async () => {
+        if(isActive) {
+            const signer = await library.getSigner();
+            
+            const parsedFundingAmt = ethers.utils.parseUnits(fundingAmount.toString(), 18);
+            const parsedPurchaseAmt = ethers.utils.parseUnits(purchaseAmount.toString(), 18);
+            
+            const tokenInstance = new ethers.Contract(tokens[fundingAsset], tokenABIs[fundingAsset], signer);
+            await tokenInstance.approve(strategyFactoryAddr, parsedFundingAmt);
+
+            const contractInstance = new ethers.Contract(strategyFactoryAddr, strategyFactoryABI, signer);
+            contractInstance.initiateNewStrategy(tokens[fundingAsset], 
+                                                 tokens[purchaseAsset], 
+                                                 parsedFundingAmt,
+                                                 parseInt(purchaseInterval),
+                                                 parsedPurchaseAmt,
+                                                 { gasLimit: 1500000 });
         }
     }
     
@@ -308,7 +334,7 @@ const Deposit = () => {
                             </div>
                         </div>
                         <div className='button-wrapper__inititate-strategy'>
-                            <button className='button__initiate-strategy'>
+                            <button className='button__initiate-strategy' onClick={initNewStrategy}>
                                 Initiate Strategy
                             </button>
                         </div>

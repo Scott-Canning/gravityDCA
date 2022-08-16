@@ -16,204 +16,196 @@ import { Bar } from 'react-chartjs-2';
 import { add, getMonth, getDate, getYear } from 'date-fns';
 import { fundingAssetMap } from '../utilities/fundingAssetMap';
 import { pairIdMap } from '../utilities/pairIdMap';
+import useMetaMask from '../hooks/MetaMask.js';
+import { strategyFactoryAddr } from '../utilities/addresses';
+import strategyFactoryABI from '../utilities/abis/strategyFactoryABI.json';
+const { ethers } = require('ethers');
 
-const PAIR_COUNT = 6
+const PAIR_COUNT = 6;
 
 const Portfolio = () => {
     const [selectedRow, setSelectedRow] = useState("");
-    const [chartLabels, setChartLabels] = useState([]);
-    const [chartData, setChartData] = useState([]);
-    const [userData, setUserData] = useState({});
+    const [selectedPairId, setSelectedPairId] = useState(0);
+    const [pairIdFrom, setPairIdFrom] = useState("");
+    const [accountStrategies, setAccountStrategies] = useState([]);
+    const [strategyData, setStrategyData] = useState({});
+    const [strategyLabels, setStrategyLabels] = useState({});
 
-    // FORMAT -> pairId : {...}
-    // const strategyDetails = {
-    //     1 : {
-    //         nextSlot: 12,
-    //         targetBalance: 1000,
-    //         purchaseInterval: 7,
-    //         purchaseAmount: 10000,
-    //         purchasesRemaining: 5,
-    //         purchaseSlots: [],
-    //         purchaseAmounts: []
-    //     },
-    //     2 : {
-    //         nextSlot: 12,
-    //         targetBalance: 1000,
-    //         purchaseInterval: 7,
-    //         purchaseAmount: 10000,
-    //         purchasesRemaining: 5,
-    //         purchaseSlots: [],
-    //         purchaseAmounts: []
-    //     }
-    // }
+    const { account, isActive, library } = useMetaMask();
 
-    const getUserData = async (user) => {
-        for(let i = 0; i < PAIR_COUNT; i++) {
-            // [LEFT OFF]
+    const getSigner = async () => {
+        try {
+            if(library) {
+                const signer = await library.getSigner();
+                return signer;
+            }
+        } catch(error) {
+            console.log('Unable to get signer: ', error)
         }
-        const purchaseSchedule = await strategyFactory.getPurchaseSchedule(user, pair1Id);
-        const [ purchaseSlots, purchaseAmounts ] = purchaseSchedule;
+    }
 
-        const expPurchaseSlots = [];
-        const expPurchaseCount = Math.ceil(deposit1 / purchase1);
-        for(let i = 0; i < expPurchaseCount; i++) {
-            expPurchaseSlots[i] = i + 1;
-        }
-        
-        const remainder = deposit1 % purchase1;
-        for(let i = 0; i < expPurchaseCount; i++) {
-            const slot = ethers.BigNumber.from(purchaseSlots[i]).toNumber();
-            assert.equal(slot, expPurchaseSlots[i]);
+    const getAccountStrategies = async () => {
+        setAccountStrategies([]);
+        const signer = await getSigner();
+        const contractInstance = new ethers.Contract(strategyFactoryAddr, strategyFactoryABI, signer);
 
-            const amount = ethers.utils.formatUnits(purchaseAmounts[i], 18);
-            if(remainder > 0 && (i === expPurchaseCount - 1)) {
-                assert.equal(amount, remainder);
-            } else {
-                assert.equal(amount, purchase1);
+        for(let i = 1; i <= PAIR_COUNT; i++) {
+            const strategyDetails = await contractInstance.getStrategyDetails(account, i);
+            const stratNextSlot = ethers.BigNumber.from(strategyDetails.nextSlot).toNumber();
+            const targetBalance = ethers.BigNumber.from(strategyDetails.targetBalance).toNumber();
+            // const interval = ethers.BigNumber.from(strategyDetails.interval).toNumber();
+            // const purchaseAmount = ethers.utils.formatUnits(strategyDetails.purchaseAmount, 18);
+            const purchasesRemaining = ethers.utils.formatUnits(strategyDetails.purchasesRemaining, 0);
+            
+            let status = "Live";
+            let nextPurchase = stratNextSlot;
+            if(purchasesRemaining === 0) {
+                status = "Ended";
+                nextPurchase = "NA";
+            }
+
+            const strategy = {
+                "pair_id": i,
+                "status": status,
+                "balance": targetBalance,
+                "next_purchase": nextPurchase,
+                "remaining": purchasesRemaining
+            }
+
+            if(targetBalance > 0 || purchasesRemaining > 0) {
+                setAccountStrategies(oldArray => [...oldArray, strategy]);
             }
         }
     }
 
-    const fundingAmount = 10000;
-    const purchaseAmount = 1000;
-    const purchaseInterval = 7;
+    useEffect(() => {
+        getAccountStrategies();
+    }, [isActive])
+
+    const getDeploymentSchedule = async () => {
+        const signer = await getSigner();
+        const contractInstance = new ethers.Contract(strategyFactoryAddr, strategyFactoryABI, signer);
+        const purchaseSchedule = await contractInstance.getPurchaseSchedule(account, selectedPairId);
+        const [ purchaseSlots, purchaseAmounts ] = purchaseSchedule;
+        const purchaseSlot = ethers.BigNumber.from(await contractInstance.purchaseSlot()).toNumber();
+ 
+        let date = new Date();
+        const noon = new Date().setHours(12, 0, 0, 0);
+        if(date > noon) {
+            date = add(date, {
+                year: 0,
+                month: 0,
+                days: 1
+            })
+        }
+
+        const purchaseAmountsFormat = [];
+        const purchaseDatesFormat = [];
+        for(let i = 0; i < purchaseSlots.length; i++) {
+            purchaseAmountsFormat[i] = ethers.utils.formatUnits(purchaseAmounts[i], 18);
+            const slotDelta = ethers.BigNumber.from(purchaseSlots[i]).toNumber() - purchaseSlot;
+            const nextDate = add(date, {
+                year: 0,
+                month: 0,
+                days: slotDelta
+            })
+            const formattedDate = (getMonth(nextDate) + 1) + '/' + getDate(nextDate) + '/' + getYear(nextDate);            
+            purchaseDatesFormat[i] = formattedDate;
+        }
+
+        if(purchaseAmounts) {
+            setStrategyData({...strategyData, [selectedPairId]: purchaseAmountsFormat});
+            setStrategyLabels({...strategyLabels, [selectedPairId]: purchaseDatesFormat});
+        }
+    }
+
+    const setRowInfo = (row) => {
+        setSelectedRow(row.id);
+        setSelectedPairId(row.original.pair_id);
+        setPairIdFrom(pairIdMap[row.original.pair_id].from)
+    }
 
     useEffect(() => {
-        calcDeploymentSchedule();
+        getDeploymentSchedule();
     }, [selectedRow])
 
     const columns = [
-    // = useMemo(
-    //     () => [
-            {
-                Header: "Pair",
-                accessor: "pair_id",
-                Cell: ({ cell: { value } }) => { return (
-                    <div className='cell-style-75'>
-                        <div className='pair-wrapper'>
-                            <img src={fundingAssetMap[pairIdMap[value].from]} className='img__pair-from-token'/>
-                            <p><i className="arrow right"></i></p>
-                            <img src={fundingAssetMap[pairIdMap[value].to]} className='img__pair-to-token'/>
+        {
+            Header: "Pair",
+            accessor: "pair_id",
+            Cell: ({ cell: { value } }) => { return (
+                <div className='cell-style-75'>
+                    <div className='pair-wrapper'>
+                        <img src={fundingAssetMap[pairIdMap[value].from]} className='img__pair-from-token'/>
+                        <p><i className="arrow right"></i></p>
+                        <img src={fundingAssetMap[pairIdMap[value].to]} className='img__pair-to-token'/>
+                    </div>
+                </div>
+            )},
+        },
+        {
+            Header: "Status",
+            accessor: "status",
+            Cell: ({ cell: { value } }) => { return (value === 'Live' ? 
+                (<div className='cell-style-75'>
+                    <div className='live-badge'>Live</div>
+                </div>) :
+                (<div className='cell-style-75'>
+                    <div className='ended-badge'>Ended</div>
+                </div>)
+            )}
+        },
+        {
+            Header: "Balance",
+            accessor: "balance",
+            Cell: ({ cell: { row, value } }) => { return (
+                <div className='cell-style-120'>
+                    <div className='balance-container'>
+                        <div className='balance-value'>{ parseFloat(value).toFixed(2) }</div>
+                        <div className='divider'></div>
+                        <div className='balance-target-asset-image-container'>
+                            <img src={fundingAssetMap[pairIdMap[row.original.pair_id].to]} className='img__balance-target-asset'/>
                         </div>
                     </div>
-                )},
-            },
-            {
-                Header: "Status",
-                accessor: "status",
-                Cell: ({ cell: { value } }) => { return (value === 'Live' ? 
-                    (<div className='cell-style-75'>
-                        <div className='live-badge'>Live</div>
-                    </div>) :
-                    (<div className='cell-style-75'>
-                        <div className='ended-badge'>Ended</div>
-                    </div>)
-                )}
-            },
-            {
-                Header: "Balance",
-                accessor: "balance",
-                Cell: ({ cell: { row, value } }) => { return (
-                    <div className='cell-style-120'>
-                        <div className='balance-container'>
-                            <div className='balance-value'>{ parseFloat(value).toFixed(2) }</div>
-                            <div className='divider'></div>
-                            <div className='balance-target-asset-image-container'>
-                                <img src={fundingAssetMap[pairIdMap[row.original.pair_id].to]} className='img__balance-target-asset'/>
-                            </div>
-                        </div>
-                    </div>)},
-            },
-            {
-                Header: "Next Purchase",
-                accessor: "next_purchase",
-                Cell: ({ cell: { value } }) => { return (value ? 
-                    (<div className='cell-style-105'>{value}</div>) :
-                    (<div className='cell-style-105'>NA</div>)
-                )},
-            },
-            {
-                Header: "Remaining",
-                accessor: "remaining",
-                Cell: ({ cell: { value } }) => { return (value ? 
-                    (<div className='cell-style-105'>{value}</div>) :
-                    (<div className='cell-style-105'>0</div>)
-                )},
-            },
-            {
-                Header: "",
-                accessor: "top_up",
-                Cell: ({ cell: { row } }) => { return (row.original.status === 'Live' ? 
-                    (<div className='cell-style'>
-                        <div><button className='button-top-up__portfolio'>Top Up</button></div>
-                    </div>) :
-                    (<div className='cell-style'>
-                        <div></div>
-                    </div>)
-                )},
-            },
-            {
-                Header: "",
-                accessor: "withdraw",
-                Cell: ({ cell: { row } }) => {return(
-                    <div className='cell-style'>
-                        <button className='button-withdraw__portfolio'>Withdraw</button>
-                    </div>)},
-            },
+                </div>)},
+        },
+        {
+            Header: "Next Purchase",
+            accessor: "next_purchase",
+            Cell: ({ cell: { value } }) => { return (value ? 
+                (<div className='cell-style-105'>{value}</div>) :
+                (<div className='cell-style-105'>NA</div>)
+            )},
+        },
+        {
+            Header: "Remaining",
+            accessor: "remaining",
+            Cell: ({ cell: { value } }) => { return (value ? 
+                (<div className='cell-style-105'>{value}</div>) :
+                (<div className='cell-style-105'>0</div>)
+            )},
+        },
+        {
+            Header: "",
+            accessor: "top_up",
+            Cell: ({ cell: { row } }) => { return (row.original.status === 'Live' ? 
+                (<div className='cell-style'>
+                    <div><button className='button-top-up__portfolio'>Top Up</button></div>
+                </div>) :
+                (<div className='cell-style'>
+                    <div></div>
+                </div>)
+            )},
+        },
+        {
+            Header: "",
+            accessor: "withdraw",
+            Cell: ({ cell: { row } }) => {return(
+                <div className='cell-style'>
+                    <button className='button-withdraw__portfolio'>Withdraw</button>
+                </div>)},
+        },
             // top_up & withdraw -> onClick, pass row.original.pair_id prop
-        ]
-    // );
-    
-    const data = [
-        {
-            "pair_id": 1,
-            "status": "Live",
-            "balance": 12.25,
-            "next_purchase": '8/30/22',
-            "remaining": 7
-        },
-        {
-            "pair_id": 2,
-            "status": "Ended",
-            "balance": 2.21,
-            "next_purchase": '',
-            "remaining": 0
-        },
-        {
-            "pair_id": 3,
-            "status": "Live",
-            "balance": 5.01,
-            "next_purchase": '9/15/22',
-            "remaining": 0
-        },
-        {
-            "pair_id": 4,
-            "status": "Ended",
-            "balance": 1000.50,
-            "next_purchase": '',
-            "remaining": 0
-        },
-        {
-            "pair_id": 5,
-            "status": "Live",
-            "balance": 3.72,
-            "next_purchase": '9/1/22',
-            "remaining": 5
-        },
-        {
-            "pair_id": 6,
-            "status": "Ended",
-            "balance": 2.21,
-            "next_purchase": '',
-            "remaining": 0
-        },
-        // {
-        //     "pair_id": 2,
-        //     "status": "Live",
-        //     "balance": 2.21,
-        //     "next_purchase": '',
-        //     "remaining": 0
-        // }
     ];
 
     ChartJS.register(
@@ -225,12 +217,12 @@ const Portfolio = () => {
     );
 
     const deploymentSchedule = {
-        labels: chartLabels,
+        labels: strategyLabels[selectedPairId],
         datasets: [
             {
                 id: '',
-                label: 'WETH',
-                data: chartData,
+                label: pairIdFrom,
+                data: strategyData[selectedPairId],
                 backgroundColor: 'rgb(141, 213, 128)',
             },
         ],
@@ -242,7 +234,7 @@ const Portfolio = () => {
         plugins: {
             title: {
                 display: true,
-                text: 'Estimated Deployment Schedule',
+                text: 'Deployment Schedule',
                 font: 'Futura'
             },
         },
@@ -254,36 +246,6 @@ const Portfolio = () => {
         }
     };
 
-    const calcDeploymentSchedule = async () => {
-        if(purchaseInterval !== '' && fundingAmount !== '' && purchaseAmount  !== '') {
-            setChartLabels([]);
-            setChartData([]);
-            
-            let date = new Date().setHours(12, 0, 0, 0);
-            let purchases = parseInt(fundingAmount / purchaseAmount);
-            const remainder = fundingAmount % purchaseAmount;
-            if(remainder > 0) {
-                purchases += 1;
-            }
-
-            for(let i = 0; i < purchases; i++) {
-                if(remainder > 0 && (i === purchases - 1)) {
-                    setChartData(oldArray => [...oldArray, remainder]);
-                } else {
-                    setChartData(oldArray => [...oldArray, purchaseAmount]);
-                }
-
-                date = add(date, {
-                    year: 0,
-                    month: 0,
-                    days: purchaseInterval
-                })
-                let formattedDate = (getMonth(date) + 1) + '/' + getDate(date) + '/' + getYear(date);
-                setChartLabels(oldArray => [...oldArray, formattedDate]);
-            }
-        }
-    }
-    
     defaults.font.family = 'futura';
     defaults.color = 'rgb(215, 211, 211)';
 
@@ -308,11 +270,11 @@ const Portfolio = () => {
                         </div>
                     </div>
                     <div className='strategies-container'>
-                        <Table columns={columns} data={data} 
+                        <Table columns={columns} data={accountStrategies} 
                             getTrProps={(row) => ({
                             style: { cursor: "auto" },
                                 onClick: () => {
-                                    setSelectedRow(row.id);
+                                    setRowInfo(row);
                                 },
                                 style: {
                                     background: row.id === selectedRow ? 'rgba(141, 213, 128, 0.546)' : '',
@@ -324,7 +286,7 @@ const Portfolio = () => {
                     </div>
                     <div className='deployment-schedule-container__portfolio'>
                         <div className='chart-container__portfolio'>
-                            <Bar type='bar' options={chartOptions} data={deploymentSchedule} />
+                            <Bar type='bar' options={chartOptions} data={deploymentSchedule}/>
                         </div>
                     </div>
                 </div>

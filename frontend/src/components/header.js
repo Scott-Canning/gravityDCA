@@ -8,17 +8,23 @@ import { networkIdMap } from '../utilities/networks';
 const Header = () => {
     const [network, setNetwork] = useState('');
     const [isHovering, setHover] = useState(false);
-    const { connect, account, disconnect, isActive, isLoading, library } = useMetaMask();
+    const { connect, account, disconnect, isActive, library } = useMetaMask();
 
     useEffect(() => {
         getNetwork().then(val => {
             setNetwork(val);
         })
-    }, [isActive]);
+    }, [connect]);
 
     const getNetwork = async () => {
-        const nw = await library.getNetwork();
-        return nw.chainId;
+        try {
+            if(library) {
+            const nw = await library.getNetwork();
+            return nw.chainId;
+            }
+        } catch(error) {
+            console.log('Unable to get network: ', error)
+        }
     }
 
     return (
@@ -37,7 +43,7 @@ const Header = () => {
                         onMouseEnter={() => setHover(true)}
                         onMouseLeave={() => setHover(false)}>
                         { isActive ?
-                            (isHovering ? '❌ Disconnect' : formatAddress(account)) :
+                            (isHovering ? 'Disconnect' : formatAddress(account)) :
                             ('Connect Wallet')
                         }
                     </button>
